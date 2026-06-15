@@ -1,18 +1,87 @@
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { clearForms } from '../../storage/forms';
+import { useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { clearForms, getForms, FormData } from '../../storage/forms';
 import { router } from 'expo-router';
 
+const COLUMNS = ['Date', 'Source', 'Non-Per.', 'Produce', 'Dairy', 'Meat', 'Baked Goods', 'Pet Food', 'Toys', 'Hygiene', 'School Sup.', 'Total'];
+
+function getRow(form: FormData): string[] {
+  const total = [
+    form.nonPerishable, form.produce, form.dairy, form.meat,
+    form.bakedGoods, form.petFood, form.toys, form.hygiene, form.schoolSupplies
+  ].reduce((sum, v) => sum + (parseFloat(v || '0') || 0), 0);
+
+  return [
+    form.date || '—',
+    form.donor || '—',
+    form.nonPerishable || '',
+    form.produce || '',
+    form.dairy || '',
+    form.meat || '',
+    form.bakedGoods || '',
+    form.petFood || '',
+    form.toys || '',
+    form.hygiene || '',
+    form.schoolSupplies || '',
+    total > 0 ? total.toString() : '—',
+  ];
+}
+
+function getTotals(forms: FormData[]): string[] {
+  const fields: (keyof FormData)[] = ['nonPerishable', 'produce', 'dairy', 'meat', 'bakedGoods', 'petFood', 'toys', 'hygiene', 'schoolSupplies'];
+  const sums = fields.map(f => forms.reduce((sum, form) => sum + (parseFloat(form[f] as string || '0') || 0), 0));
+  const grand = sums.reduce((a, b) => a + b, 0);
+  return ['Total', '', ...sums.map(s => s > 0 ? s.toString() : ''), grand > 0 ? grand.toString() : '—'];
+}
+
 export default function SaveScreen() {
-  function handleSave() {
+  const [forms, setForms] = useState<FormData[]>([]);
+  const [serverUrl, setServerUrl] = useState('http://192.168.1.100:5000');
+  const [saving, setSaving] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      getForms().then(setForms);
+    }, [])
+  );
+
+  const staged = forms.filter(f => f.status === 'staged');
+  const notReviewed = forms.filter(f => f.status === 'scanned' || f.status === 'needs_review');
+
+  async function handleSave() {
+    if (staged.length === 0) {
+      Alert.alert('Nothing to save', 'Stage at least one form in Review first.');
+      return;
+    }
     Alert.alert(
       'Save to spreadsheet?',
-      '3 reviewed forms will be added to the June 2026 spreadsheet.',
+      `${staged.length} form${staged.length !== 1 ? 's' : ''} will be added to the spreadsheet.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Save', onPress: () => {} },
+        { text: 'Save', onPress: doSave },
       ]
     );
+  }
+
+  async function doSave() {
+    setSaving(true);
+    try {
+      const response = await fetch(`${serverUrl}/append`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forms: staged }),
+      });
+      if (!response.ok) throw new Error('Server error');
+      Alert.alert('Saved!', `${staged.length} form${staged.length !== 1 ? 's' : ''} added to spreadsheet.`);
+      await clearForms();
+      router.push('/(tabs)/');
+    } catch (e) {
+      Alert.alert('Error', 'Could not reach the server. Check the URL and try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDiscard() {
@@ -32,51 +101,50 @@ export default function SaveScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      <Text style={styles.sectionLabel}>Preview — June 2026</Text>
-      <ScrollView horizontal style={styles.tableWrap}>
-        <View>
-          <View style={[styles.row, styles.headerRow]}>
-            {['Date','Source','Non-Per.','Produce','Dairy','Meat','Total'].map(col => (
-              <Text key={col} style={[styles.cell, styles.headerCell]}>{col}</Text>
-            ))}
-          </View>
-          {[
-            ['5/20','Port BIC','29','','','','29'],
-            ['6/1','SDM','160','','360','','520'],
-            ['6/2','Anon','','91','','','91'],
-          ].map((r, i) => (
-            <View key={i} style={styles.row}>
-              {r.map((cell, j) => <Text key={j} style={styles.cell}>{cell}</Text>)}
-            </View>
-          ))}
-          <View style={[styles.row, styles.totalRow]}>
-            {['Total','','189','91','360','','640'].map((cell, j) => (
-              <Text key={j} style={[styles.cell, styles.totalCell]}>{cell}</Text>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
+      <Text style={styles.sectionLabel}>Preview — {staged.length} staged form{staged.length !== 1 ? 's' : ''}</Text>
 
-      <View style={styles.warning}>
-        <Ionicons name="warning-outline" size={15} color="#633806" />
-        <Text style={styles.warningText}>1 form still needs review — it won't be saved.</Text>
-      </View>
+      {staged.length === 0
+        ? <Text style={styles.empty}>No staged forms yet. Review and stage forms first.</Text>
+        : <ScrollView horizontal style={styles.tableWrap}>
+            <View>
+              <View style={[styles.tableRow, styles.headerRow]}>
+                {COLUMNS.map(col => <Text key={col} style={[styles.cell, styles.headerCell]}>{col}</Text>)}
+              </View>
+              {staged.map(form => (
+                <View key={form.id} style={styles.tableRow}>
+                  {getRow(form).map((cell, j) => <Text key={j} style={styles.cell}>{cell}</Text>)}
+                </View>
+              ))}
+              <View style={[styles.tableRow, styles.totalRow]}>
+                {getTotals(staged).map((cell, j) => <Text key={j} style={[styles.cell, styles.totalCell]}>{cell}</Text>)}
+              </View>
+            </View>
+          </ScrollView>
+      }
+
+      {notReviewed.length > 0 && (
+        <View style={styles.warning}>
+          <Ionicons name="warning-outline" size={15} color="#633806" />
+          <Text style={styles.warningText}>{notReviewed.length} form{notReviewed.length !== 1 ? 's' : ''} still need review — they won't be saved.</Text>
+        </View>
+      )}
 
       <Text style={[styles.sectionLabel, { marginTop: 8 }]}>Destination</Text>
       <View style={styles.card}>
         <Text style={styles.fieldLabel}>Server URL</Text>
         <TextInput
           style={styles.input}
-          defaultValue="http://192.168.1.100:5000"
+          value={serverUrl}
+          onChangeText={setServerUrl}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
         />
       </View>
 
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+      <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
         <Ionicons name="save-outline" size={18} color="#fff" />
-        <Text style={styles.saveBtnText}>Save 3 forms to spreadsheet</Text>
+        <Text style={styles.saveBtnText}>{saving ? 'Saving...' : `Save ${staged.length} form${staged.length !== 1 ? 's' : ''} to spreadsheet`}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard}>
@@ -92,12 +160,13 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 12, paddingBottom: 32 },
   sectionLabel: { fontSize: 12, fontWeight: '500', color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 },
   tableWrap: { borderWidth: 0.5, borderColor: '#0002', borderRadius: 10 },
-  row: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#0001' },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#0001' },
   headerRow: { backgroundColor: '#185FA5' },
-  cell: { width: 72, padding: 7, fontSize: 11, color: '#1a1a1a' },
+  cell: { width: 80, padding: 7, fontSize: 11, color: '#1a1a1a' },
   headerCell: { color: '#fff', fontWeight: '500' },
   totalRow: { backgroundColor: '#f5f5f3' },
   totalCell: { fontWeight: '500' },
+  empty: { fontSize: 14, color: '#aaa', textAlign: 'center', paddingVertical: 20 },
   warning: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FAEEDA', borderRadius: 8, padding: 10 },
   warningText: { fontSize: 13, color: '#633806', flex: 1 },
   card: { borderWidth: 0.5, borderColor: '#0002', borderRadius: 10, padding: 14, gap: 6 },
