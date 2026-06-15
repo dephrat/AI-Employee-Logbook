@@ -1,32 +1,37 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-
-const MOCK_FORMS = [
-  { id: '1', donor: 'Port BIC', date: 'May 20', weight: '29 lbs', categories: 'Non-Perishable', status: 'staged' },
-  { id: '2', donor: 'SDM', date: 'Jun 1', weight: '520 lbs', categories: 'Non-Perishable, Dairy', status: 'staged' },
-  { id: '3', donor: 'Anon', date: 'Jun 2', weight: '91 lbs', categories: 'Produce', status: 'reviewed' },
-  { id: '4', donor: 'Form 4', date: 'Jun 4', weight: '—', categories: 'Analyzed — tap to confirm', status: 'needs_review' },
-];
+import { router, useFocusEffect } from 'expo-router';
+import { useState, useCallback } from 'react';
+import { getForms, FormData } from '../../storage/forms';
 
 const BADGE: Record<string, { label: string; bg: string; color: string }> = {
-  staged:      { label: 'Staged',       bg: '#E6F1FB', color: '#0C447C' },
-  reviewed:    { label: 'Reviewed',     bg: '#EAF3DE', color: '#27500A' },
-  needs_review:{ label: 'Needs review', bg: '#FAEEDA', color: '#633806' },
+  staged:       { label: 'Staged',       bg: '#E6F1FB', color: '#0C447C' },
+  reviewed:     { label: 'Reviewed',     bg: '#EAF3DE', color: '#27500A' },
+  needs_review: { label: 'Needs review', bg: '#FAEEDA', color: '#633806' },
+  scanned:      { label: 'Scanned',      bg: '#F1EFE8', color: '#5F5E5A' },
 };
 
 export default function ReviewScreen() {
-  const needsReview = MOCK_FORMS.filter(f => f.status === 'needs_review').length;
+  const [forms, setForms] = useState<FormData[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      getForms().then(setForms);
+    }, [])
+  );
+
+  const needsReview = forms.filter(f => f.status === 'needs_review' || f.status === 'scanned').length;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.summary}>{MOCK_FORMS.length} total · {needsReview} need review</Text>
+      <Text style={styles.summary}>{forms.length} total · {needsReview} need review</Text>
       <FlatList
-        data={MOCK_FORMS}
+        data={forms}
         keyExtractor={item => item.id}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={<Text style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>No photos yet — go to Camera to start.</Text>}
         renderItem={({ item }) => {
-          const badge = BADGE[item.status] || BADGE.staged;
+          const badge = BADGE[item.status] || BADGE.scanned;
           return (
             <TouchableOpacity style={styles.row} onPress={() => router.push('/form-detail')}>
               <View style={styles.thumb}>
@@ -37,8 +42,8 @@ export default function ReviewScreen() {
                 />
               </View>
               <View style={styles.info}>
-                <Text style={styles.name}>{item.donor}</Text>
-                <Text style={styles.meta}>{item.date} · {item.weight} · {item.categories}</Text>
+                <Text style={styles.name}>{item.donor || 'Unnamed form'}</Text>
+                <Text style={styles.meta}>{item.date || '—'} · {item.weight || '—'} lbs · {item.status}</Text>
               </View>
               <View style={[styles.badge, { backgroundColor: badge.bg }]}>
                 <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
