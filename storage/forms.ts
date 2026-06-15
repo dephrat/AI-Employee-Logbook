@@ -76,3 +76,22 @@ export async function updateForm(id: string, updates: Partial<FormData>): Promis
 export async function clearForms(): Promise<void> {
   await AsyncStorage.removeItem(FORMS_KEY);
 }
+
+const SERVER_URL_KEY = 'logbook_server_url';
+
+export async function getServerUrl(): Promise<string> {
+  try {
+    const result = await AsyncStorage.getItem(SERVER_URL_KEY);
+    return result || 'http://192.168.1.100:5000';
+  } catch {
+    return 'http://192.168.1.100:5000';
+  }
+}
+
+export async function saveServerUrl(url: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SERVER_URL_KEY, url);
+  } catch (e) {
+    console.error('Failed to save server URL:', e);
+  }
+}

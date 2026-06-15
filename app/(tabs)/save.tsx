@@ -2,7 +2,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet 
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { clearForms, getForms, FormData } from '../../storage/forms';
+import { clearForms, getForms, FormData, getServerUrl, saveServerUrl } from '../../storage/forms';
 import { router } from 'expo-router';
 
 const COLUMNS = ['Date', 'Source', 'Non-Per.', 'Produce', 'Dairy', 'Meat', 'Baked Goods', 'Pet Food', 'Toys', 'Hygiene', 'School Sup.', 'Total'];
@@ -44,6 +44,7 @@ export default function SaveScreen() {
   useFocusEffect(
     useCallback(() => {
       getForms().then(setForms);
+      getServerUrl().then(setServerUrl);
     }, [])
   );
 
@@ -135,7 +136,10 @@ export default function SaveScreen() {
         <TextInput
           style={styles.input}
           value={serverUrl}
-          onChangeText={setServerUrl}
+          onChangeText={async (v) => {
+            setServerUrl(v);
+            await saveServerUrl(v);
+          }}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"

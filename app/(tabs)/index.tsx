@@ -1,11 +1,10 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef } from 'react';
-import { router } from 'expo-router';
-import { addForm, getForms, FormData } from '../../storage/forms';
-import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { addForm, getForms, updateForm, getServerUrl, FormData } from '../../storage/forms';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -40,6 +39,32 @@ export default function CameraScreen() {
     if (photo) {
       const form = await addForm(photo.uri);
       setForms(prev => [...prev, form]);
+      runOcr(form, photo.uri); // fire and forget
+    }
+  }
+
+  async function runOcr(form: FormData, uri: string) {
+    try {
+      const serverUrl = await getServerUrl();
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: 'base64',
+      });
+
+      const ocrResponse = await fetch(`${serverUrl}/ocr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
+      });
+
+      const data = await ocrResponse.json();
+      if (data.ok && data.fields) {
+        await updateForm(form.id, { ...data.fields, status: 'needs_review' });
+        setForms(prev => prev.map(f =>
+          f.id === form.id ? { ...f, ...data.fields, status: 'needs_review' } : f
+        ));
+      }
+    } catch (e) {
+      console.error('OCR failed:', e);
     }
   }
 
