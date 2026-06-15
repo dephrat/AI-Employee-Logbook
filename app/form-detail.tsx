@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -44,7 +44,14 @@ export default function FormDetailScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-
+      {form.photoUri && (
+        <Image
+          source={{ uri: form.photoUri }}
+          style={styles.photo}
+          resizeMode="contain"
+        />
+      )}
+      
       {/* Donation info */}
       <View style={styles.card}>
         <Text style={styles.sectionLabel}>Donation info</Text>
@@ -188,4 +195,5 @@ const styles = StyleSheet.create({
   cancelText: { color: '#185FA5', fontSize: 15 },
   stageBtn: { flex: 2, padding: 13, backgroundColor: '#185FA5', borderRadius: 10, alignItems: 'center' },
   stageText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  photo: { width: '100%', height: 300, borderRadius: 12, backgroundColor: '#111' },
 });
