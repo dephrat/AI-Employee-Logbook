@@ -42,6 +42,14 @@ export default function FormDetailScreen() {
     router.back();
   }
 
+  const categorySum = [
+    form.nonPerishable, form.produce, form.dairy, form.meat,
+    form.bakedGoods, form.petFood, form.toys, form.hygiene, form.schoolSupplies
+  ].reduce((sum, v) => sum + (parseFloat(v as string || '0') || 0), 0);
+
+  const totalWeight = parseFloat(form.weight as string || '0') || 0;
+  const weightMismatch = totalWeight > 0 && categorySum > 0 && Math.abs(categorySum - totalWeight) > 0.5;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {form.photoUri && (
@@ -51,7 +59,7 @@ export default function FormDetailScreen() {
           resizeMode="contain"
         />
       )}
-      
+
       {/* Donation info */}
       <View style={styles.card}>
         <Text style={styles.sectionLabel}>Donation info</Text>
@@ -77,12 +85,17 @@ export default function FormDetailScreen() {
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Total weight (lbs)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, weightMismatch && styles.inputWarning]}
               placeholder="0"
               keyboardType="numeric"
               value={form.weight || ''}
               onChangeText={v => setField('weight', v)}
             />
+            {weightMismatch && (
+              <Text style={styles.weightWarning}>
+                Category weights sum to {categorySum} — doesn't match total of {totalWeight}
+              </Text>
+            )}
           </View>
         </View>
       </View>
@@ -173,12 +186,15 @@ export default function FormDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
+  photo: { width: '100%', height: 300, borderRadius: 12, backgroundColor: '#111' },
   card: { borderWidth: 0.5, borderColor: '#0002', borderRadius: 12, padding: 14, gap: 10 },
   sectionLabel: { fontSize: 12, fontWeight: '500', color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 },
   fields: { gap: 10 },
   field: { gap: 4 },
   fieldLabel: { fontSize: 13, color: '#888' },
   input: { borderWidth: 0.5, borderColor: '#0002', borderRadius: 8, padding: 9, fontSize: 15, color: '#1a1a1a' },
+  inputWarning: { borderColor: '#E07B00', borderWidth: 1.5 },
+  weightWarning: { fontSize: 12, color: '#E07B00', marginTop: 2 },
   catRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: '#0001' },
   catLabel: { flex: 1, fontSize: 14, color: '#1a1a1a' },
   catInput: { width: 72, borderWidth: 0.5, borderColor: '#0002', borderRadius: 8, padding: 7, fontSize: 14, color: '#1a1a1a', textAlign: 'right' },
@@ -195,5 +211,4 @@ const styles = StyleSheet.create({
   cancelText: { color: '#185FA5', fontSize: 15 },
   stageBtn: { flex: 2, padding: 13, backgroundColor: '#185FA5', borderRadius: 10, alignItems: 'center' },
   stageText: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  photo: { width: '100%', height: 300, borderRadius: 12, backgroundColor: '#111' },
 });
