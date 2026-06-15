@@ -17,6 +17,7 @@ export default function TabLayout() {
         options={{
           title: 'Logbook',
           tabBarLabel: 'Camera',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => <Ionicons name="camera-outline" size={size} color={color} />,
         }}
       />

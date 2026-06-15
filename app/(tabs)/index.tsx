@@ -5,11 +5,13 @@ import { useState, useRef, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { addForm, getForms, updateForm, getServerUrl, FormData } from '../../storage/forms';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [forms, setForms] = useState<FormData[]>([]);
   const cameraRef = useRef<CameraView>(null);
+  const insets = useSafeAreaInsets();
 
   useFocusEffect(
     useCallback(() => {
@@ -70,49 +72,70 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Viewfinder */}
+      {/* Camera fills entire screen */}
       <CameraView style={styles.viewfinder} ref={cameraRef} facing="back" />
 
-      {/* Thumbnail strip */}
-      <ScrollView horizontal style={styles.strip} contentContainerStyle={styles.stripContent}>
-        {forms.length === 0
-          ? <Text style={styles.stripEmpty}>No photos yet — tap the shutter</Text>
-          : forms.map((form, i) => (
-              <Image key={form.id} source={{ uri: form.photoUri }} style={styles.thumb} />
-            ))
-        }
-      </ScrollView>
+      {/* Controls overlaid on top */}
+      <View style={styles.overlay}>
+        {/* Thumbnail strip — top */}
+        <View style={styles.topBar}>
+          <ScrollView horizontal contentContainerStyle={styles.stripContent}>
+            {forms.length === 0
+              ? <Text style={styles.stripEmpty}>No photos yet</Text>
+              : forms.map((form) => (
+                  <Image key={form.id} source={{ uri: form.photoUri }} style={styles.thumb} />
+                ))
+            }
+          </ScrollView>
+        </View>
 
-      {/* Shutter */}
-      <View style={styles.shutterRow}>
-        <TouchableOpacity style={styles.shutter} onPress={takePicture}>
-          <View style={styles.shutterInner} />
-        </TouchableOpacity>
+        {/* Spacer */}
+        <View style={{ flex: 1 }} />
+
+        {/* Bottom controls */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={[styles.doneBtn, forms.length === 0 && styles.doneBtnDisabled]}
+            disabled={forms.length === 0}
+            onPress={() => router.push('/(tabs)/explore')}
+          >
+            <Text style={styles.doneBtnText}>Review {forms.length} photo{forms.length !== 1 ? 's' : ''}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.shutter} onPress={takePicture}>
+            <View style={styles.shutterInner} />
+          </TouchableOpacity>
+        </View>
       </View>
-
-      {/* Review button */}
-      <TouchableOpacity
-        style={[styles.doneBtn, forms.length === 0 && styles.doneBtnDisabled]}
-        disabled={forms.length === 0}
-        onPress={() => router.push('/(tabs)/explore')}
-      >
-        <Text style={styles.doneBtnText}>Review {forms.length} photo{forms.length !== 1 ? 's' : ''}</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 16, gap: 12 },
-  viewfinder: { flex: 1, borderRadius: 12, overflow: 'hidden' },
-  strip: { height: 80 },
-  stripContent: { alignItems: 'center', paddingVertical: 12, gap: 8 },
-  stripEmpty: { color: '#aaa', fontSize: 13 },
-  thumb: { width: 56, height: 56, borderRadius: 8 },
-  shutterRow: { alignItems: 'center', paddingVertical: 8 },
-  shutter: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#fff', borderWidth: 3, borderColor: '#185FA5', alignItems: 'center', justifyContent: 'center' },
-  shutterInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#185FA5' },
-  doneBtn: { backgroundColor: '#185FA5', borderRadius: 10, padding: 14, alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#000' },
+  viewfinder: { ...StyleSheet.absoluteFillObject },
+  overlay: { flex: 1, flexDirection: 'column' },
+  topBar: {
+    paddingTop: 48,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    height: 110,
+    justifyContent: 'center',
+  },
+  stripContent: { alignItems: 'center', gap: 8 },
+  stripEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
+  thumb: { width: 56, height: 56, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  bottomBar: {
+    paddingBottom: 32,
+    paddingHorizontal: 32,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    gap: 20,
+    paddingTop: 16,
+  },
+  shutter: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  shutterInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff' },
+  doneBtn: { backgroundColor: '#185FA5', borderRadius: 10, padding: 12, paddingHorizontal: 24, alignItems: 'center', width: '100%' },
   doneBtnDisabled: { opacity: 0.4 },
   doneBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   permContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16, backgroundColor: '#fff' },
