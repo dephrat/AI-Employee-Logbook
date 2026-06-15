@@ -1,5 +1,6 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 const MOCK_FORMS = [
   { id: '1', donor: 'Port BIC', date: 'May 20', weight: '29 lbs', categories: 'Non-Perishable', status: 'staged' },
@@ -46,6 +47,10 @@ export default function ReviewScreen() {
           );
         }}
       />
+      <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/(tabs)/')}>
+        <Ionicons name="camera-outline" size={18} color="#185FA5" />
+        <Text style={styles.addBtnText}>Add more photos</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -61,4 +66,6 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   badgeText: { fontSize: 11, fontWeight: '500' },
   separator: { height: 0.5, backgroundColor: '#0001' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 0.5, borderColor: '#185FA5', borderRadius: 10, padding: 13, marginTop: 8 },
+  addBtnText: { color: '#185FA5', fontSize: 15 },
 });
