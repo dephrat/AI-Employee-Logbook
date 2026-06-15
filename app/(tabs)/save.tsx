@@ -1,5 +1,7 @@
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { clearForms } from '../../storage/forms';
+import { router } from 'expo-router';
 
 export default function SaveScreen() {
   function handleSave() {
@@ -13,13 +15,16 @@ export default function SaveScreen() {
     );
   }
 
-  function handleDiscard() {
+  async function handleDiscard() {
     Alert.alert(
       'Discard unsaved changes?',
       'All photos and form data will be cleared. This cannot be undone.',
       [
         { text: 'Keep', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: () => {} },
+        { text: 'Discard', style: 'destructive', onPress: async () => {
+          await clearForms();
+          router.push('/(tabs)/');
+        }},
       ]
     );
   }

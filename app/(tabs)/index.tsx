@@ -3,12 +3,20 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef } from 'react';
 import { router } from 'expo-router';
-import { addForm, FormData } from '../../storage/forms';
+import { addForm, getForms, FormData } from '../../storage/forms';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [forms, setForms] = useState<FormData[]>([]);
   const cameraRef = useRef<CameraView>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      getForms().then(setForms);
+    }, [])
+  );
 
   if (!permission) {
     return <View style={styles.container} />;
