@@ -33,7 +33,7 @@ export default function ReviewScreen() {
         renderItem={({ item }) => {
           const badge = BADGE[item.status] || BADGE.scanned;
           return (
-            <TouchableOpacity style={styles.row} onPress={() => router.push('/form-detail')}>
+            <TouchableOpacity style={styles.row} onPress={() => router.push({ pathname: '/form-detail', params: { id: item.id } })}>
               <View style={styles.thumb}>
                 <Ionicons
                   name={item.status === 'needs_review' ? 'warning-outline' : 'document-text-outline'}
