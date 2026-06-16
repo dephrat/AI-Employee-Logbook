@@ -37,6 +37,18 @@ export default function ReviewScreen() {
         <Ionicons name="refresh-outline" size={18} color="#185FA5" />
         <Text style={styles.refreshText}>Refresh</Text>
       </TouchableOpacity>
+      {needsReview > 0 && (
+        <TouchableOpacity
+          style={styles.reviewQueueBtn}
+          onPress={() => {
+            const next = forms.find(f => f.status === 'scanned' || f.status === 'needs_review');
+            if (next) router.push({ pathname: '/form-detail', params: { id: next.id } });
+          }}
+        >
+          <Ionicons name="arrow-forward-circle-outline" size={18} color="#fff" />
+          <Text style={styles.reviewQueueBtnText}>Review next ({needsReview} remaining)</Text>
+        </TouchableOpacity>
+      )}
       <FlatList
         data={forms}
         keyExtractor={item => item.id}
@@ -89,4 +101,6 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#185FA5', fontSize: 15 },
   refreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
   refreshText: { color: '#185FA5', fontSize: 14 },
+  reviewQueueBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#185FA5', borderRadius: 10, padding: 12, marginBottom: 4 },
+  reviewQueueBtnText: { color: '#fff', fontSize: 14, fontWeight: '500' },
 });
