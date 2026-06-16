@@ -73,7 +73,15 @@ export default function CameraScreen() {
   return (
     <View style={styles.container}>
       {/* Camera fills entire screen */}
-      <CameraView style={styles.viewfinder} ref={cameraRef} facing="back" />
+      <CameraView 
+        style={styles.viewfinder} 
+        ref={cameraRef} 
+        facing="back" 
+        autofocus="on"
+        onTap={({ nativeEvent }) => {
+          cameraRef.current?.focus({ x: nativeEvent.touchX, y: nativeEvent.touchY });
+        }}
+      />
 
       {/* Controls overlaid on top */}
       <View style={styles.overlay}>

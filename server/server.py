@@ -1,24 +1,16 @@
 """
-Logbook Flask server
-Receives staged donation forms from the app and appends to XLSX.
-Also provides OCR via Claude Vision for handwritten donation forms.
+Logbook Flask server — Port Cares In-Kind Donations
 
-File structure: one file per year (e.g. "2026 IN.xlsx")
-                one tab per month (e.g. "JUN")
-
-POST /append
-  Body: { "forms": [...], "month": "JUN", "year": "2026" }
-  Response: { "ok": true, "rows_added": N }
-
-POST /ocr
-  Body: { "image": "<base64 encoded image>" }
-  Response: { "ok": true, "fields": { ... } }
+POST /append  — receives staged forms, appends to correct XLSX tab in date order
+POST /ocr     — receives base64 image, returns extracted fields via Claude Vision
+GET  /status  — health check
 """
 
 from flask import Flask, request, jsonify
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableStyleInfo
 import os
 import datetime
 import json
@@ -28,49 +20,45 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-
 client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
 
-# Directory where XLSX files live
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Column definitions — must match the app's field schema
+FILENAME = 'Port Cares In 2026.xlsx'
+
+# Column order matches Port Cares format
 COLUMNS = [
-    ('Date',            'date'),
-    ('Source',          'donor'),
-    ('Non-Perishable',  'nonPerishable'),
-    ('Produce',         'produce'),
-    ('Dairy',           'dairy'),
-    ('Meat',            'meat'),
-    ('Baked Goods',     'bakedGoods'),
-    ('Pet Food',        'petFood'),
-    ('Toys',            'toys'),
-    ('Hygiene',         'hygiene'),
-    ('School Supplies', 'schoolSupplies'),
-    ('Other',           'other'),
-    ('Perishable',      None),   # computed
-    ('Eggs',            None),   # blank (spreadsheet compat)
-    ('Total Weight',    'weight'),
-    # Contact (optional)
-    ('Name/Business',   'contactName'),
-    ('Address',         'contactAddress'),
-    ('Email',           'contactEmail'),
-    ('Phone',           'contactPhone'),
-    ('New Donor',       'newDonor'),
+    ('A', 'DATE',           'date'),
+    ('B', 'SOURCE',         'donor'),
+    ('C', 'PERISHABLE',     None),         # computed
+    ('D', 'NON-PERISHABLE', 'nonPerishable'),
+    ('E', 'MEAT',           'meat'),
+    ('F', 'DAIRY',          'dairy'),
+    ('G', 'EGGS',           None),         # always blank
+    ('H', 'PRODUCE',        'produce'),
+    ('I', 'MONTHLY TOTAL',  None),         # computed: C+D
+    ('J', 'YTD',            None),         # blank, Port Cares fills manually
 ]
 
-# Categories that sum into Perishable
 PERISHABLE_FIELDS = ['produce', 'dairy', 'meat', 'bakedGoods']
-
-MONTH_NAMES = {
-    '01': 'JAN', '02': 'FEB', '03': 'MAR', '04': 'APR',
-    '05': 'MAY', '06': 'JUN', '07': 'JUL', '08': 'AUG',
-    '09': 'SEP', '10': 'OCT', '11': 'NOV', '12': 'DEC',
-}
 
 HEADER_FILL = PatternFill(start_color='185FA5', end_color='185FA5', fill_type='solid')
 HEADER_FONT = Font(bold=True, color='FFFFFF')
+BOLD_FONT   = Font(bold=True)
+
+INSTRUCTIONS = (
+    'INSTRUCTIONS: Enter as per weigh-in logs by scale in WH. '
+    'Always enter value under perishable or non-perishable AND under '
+    'appropriate category i.e. "produce" or "meat".'
+)
+
+MONTH_NAMES = {
+    1:'JAN',2:'FEB',3:'MAR',4:'APR',5:'MAY',6:'JUN',
+    7:'JUL',8:'AUG',9:'SEP',10:'OCT',11:'NOV',12:'DEC',
+}
+
+TABLE_NAME_PREFIX = 'InKind'
 
 OCR_PROMPT = """You are extracting data from a PortCares In-Kind Donations form.
 
@@ -111,66 +99,18 @@ Rules:
 - Weight values should be numbers only (no "lbs" or units).
 - Date should be in mm/dd/yyyy format.
 - newDonor should be "yes", "no", or "" if not filled.
+- If a value appears crossed out with a new value written nearby, use the new value only.
+- If you cannot determine which value is correct due to corrections or unclear writing, make your best guess — the reviewer will verify.
 - Return ONLY the JSON object, no other text.
 """
 
 
-@app.route('/ocr', methods=['POST'])
-def ocr():
-    data = request.get_json()
-    if not data or 'image' not in data:
-        return jsonify({'ok': False, 'error': 'Missing image'}), 400
-
-    image_data = data['image']
-    # Strip data URL prefix if present (e.g. "data:image/jpeg;base64,...")
-    if ',' in image_data:
-        image_data = image_data.split(',')[1]
-
-    try:
-        message = client.messages.create(
-            model='claude-haiku-4-5',
-            max_tokens=1024,
-            messages=[
-                {
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'image',
-                            'source': {
-                                'type': 'base64',
-                                'media_type': 'image/jpeg',
-                                'data': image_data,
-                            },
-                        },
-                        {
-                            'type': 'text',
-                            'text': OCR_PROMPT,
-                        }
-                    ],
-                }
-            ],
-        )
-
-        raw = message.content[0].text.strip()
-        # Strip markdown code fences if present
-        if raw.startswith('```'):
-            raw = raw.split('```')[1]
-            if raw.startswith('json'):
-                raw = raw[4:]
-        fields = json.loads(raw.strip())
-        return jsonify({'ok': True, 'fields': fields})
-
-    except Exception as e:
-        print(f'OCR error: {e}')
-        return jsonify({'ok': False, 'error': str(e)}), 500
+def get_xlsx_path():
+    return os.path.join(DATA_DIR, FILENAME)
 
 
-def get_xlsx_path(year: str) -> str:
-    return os.path.join(DATA_DIR, f'{year} IN.xlsx')
-
-
-def get_or_create_workbook(year: str):
-    path = get_xlsx_path(year)
+def get_or_create_workbook():
+    path = get_xlsx_path()
     if os.path.exists(path):
         return load_workbook(path), path
     wb = Workbook()
@@ -178,43 +118,148 @@ def get_or_create_workbook(year: str):
     return wb, path
 
 
-def get_or_create_sheet(wb, month: str):
-    if month in wb.sheetnames:
-        return wb[month], True
-    ws = wb.create_sheet(month)
-    headers = [col[0] for col in COLUMNS]
-    for col_idx, header in enumerate(headers, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=header)
+def setup_sheet(ws):
+    """
+    Row 1: Instructions (merged, italic)
+    Row 2: MONTHLY TOTAL with SUM formulas referencing the table
+    Row 3: Table headers (blue)
+    Row 4+: Data (managed by table)
+    """
+    table_name = f"{TABLE_NAME_PREFIX}_{ws.title}"
+
+    # Row 1: Instructions
+    ws.merge_cells('A1:J1')
+    ws['A1'] = INSTRUCTIONS
+    ws['A1'].font = Font(italic=True, size=9)
+    ws['A1'].alignment = Alignment(wrap_text=True)
+    ws.row_dimensions[1].height = 30
+
+    # Row 2: MONTHLY TOTAL with table-reference SUM formulas
+    ws['A2'] = 'MONTHLY TOTAL'
+    ws['A2'].font = BOLD_FONT
+    # SUM formulas for numeric columns — reference table by name
+    for col_letter, header, _ in COLUMNS:
+        if col_letter in ('A', 'B'):
+            continue
+        col_idx = ord(col_letter) - ord('A') + 1
+        ws.cell(row=2, column=col_idx).value = f'=SUM({table_name}[{header}])'
+
+    # Row 3: Table headers (styled blue — table will override but we style anyway)
+    for col_letter, header, _ in COLUMNS:
+        col_idx = ord(col_letter) - ord('A') + 1
+        cell = ws.cell(row=3, column=col_idx)
+        cell.value = header
         cell.font = HEADER_FONT
         cell.fill = HEADER_FILL
         cell.alignment = Alignment(horizontal='center')
-        ws.column_dimensions[get_column_letter(col_idx)].width = max(len(header) + 4, 12)
-    return ws, False
+
+    # Column widths
+    widths = {'A':10,'B':20,'C':14,'D':16,'E':10,'F':10,'G':8,'H':10,'I':14,'J':10}
+    for col, width in widths.items():
+        ws.column_dimensions[col].width = width
+
+    # Create table starting at row 3, initial range covers header + 1 empty row
+    # (openpyxl requires at least 2 rows for a table)
+    tab = Table(displayName=table_name, ref='A3:J4')
+    style = TableStyleInfo(
+        name='TableStyleMedium2',
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=False,
+        showColumnStripes=False,
+    )
+    tab.tableStyleInfo = style
+    ws.add_table(tab)
 
 
-def form_to_row(form: dict) -> list:
-    row = []
-    for _, field in COLUMNS:
-        if field is None:
-            row.append(None)
+def get_table(ws):
+    """Return the InKind table for this sheet, or None."""
+    for tbl in ws.tables.values():
+        if tbl.displayName.startswith(TABLE_NAME_PREFIX):
+            return tbl
+    return None
+
+
+def extend_table(ws, new_last_row):
+    """Extend the table ref to include new_last_row."""
+    tbl = get_table(ws)
+    if tbl:
+        # Keep column range A:J, extend rows
+        tbl.ref = f'A3:J{new_last_row}'
+
+
+def parse_date(date_str):
+    if not date_str:
+        return None
+    try:
+        return datetime.datetime.strptime(date_str.strip(), '%m/%d/%Y').date()
+    except Exception:
+        return None
+
+
+def compute_row_values(form):
+    def num(field):
+        try:
+            v = form.get(field, '')
+            return float(v) if v else 0
+        except (ValueError, TypeError):
+            return 0
+
+    perishable    = sum(num(f) for f in PERISHABLE_FIELDS)
+    non_perishable = num('nonPerishable')
+    meat          = num('meat')
+    dairy         = num('dairy')
+    produce       = num('produce')
+    monthly_total = perishable + non_perishable
+
+    return {
+        'A': parse_date(form.get('date', '')),
+        'B': form.get('donor') or None,
+        'C': perishable      if perishable > 0      else None,
+        'D': non_perishable  if non_perishable > 0  else None,
+        'E': meat            if meat > 0            else None,
+        'F': dairy           if dairy > 0           else None,
+        'G': None,
+        'H': produce         if produce > 0         else None,
+        'I': monthly_total   if monthly_total > 0   else None,
+        'J': None,
+    }
+
+
+def find_insert_row(ws, target_date):
+    """Find correct insertion row to maintain date order. Data starts at row 4."""
+    last_data_row = 3
+    for row in range(4, ws.max_row + 1):
+        if any(ws.cell(row=row, column=col).value is not None for col in range(1, 11)):
+            last_data_row = row
+
+    if target_date is None:
+        return last_data_row + 1
+
+    insert_after = 3
+    for row in range(4, last_data_row + 1):
+        cell_val = ws.cell(row=row, column=1).value
+        if cell_val is not None:
+            row_date = cell_val.date() if hasattr(cell_val, 'date') else parse_date(str(cell_val))
+            if row_date and row_date <= target_date:
+                insert_after = row
+            elif row_date and row_date > target_date:
+                break
         else:
-            val = form.get(field, '')
-            if val and field not in ('date', 'donor', 'other', 'contactName',
-                                     'contactAddress', 'contactEmail', 'contactPhone', 'newDonor'):
-                try:
-                    val = float(val) if '.' in str(val) else int(val)
-                except (ValueError, TypeError):
-                    pass
-            row.append(val if val != '' else None)
+            if insert_after >= 4:
+                insert_after = row
 
-    perishable_sum = 0
-    for field in PERISHABLE_FIELDS:
-        idx = next(i for i, (_, f) in enumerate(COLUMNS) if f == field)
-        v = row[idx]
-        if isinstance(v, (int, float)):
-            perishable_sum += v
-    row[12] = perishable_sum if perishable_sum > 0 else None
-    return row
+    return insert_after + 1
+
+
+def insert_form_row(ws, row_num, values):
+    ws.insert_rows(row_num)
+    for col_letter, value in values.items():
+        col_idx = ord(col_letter) - ord('A') + 1
+        cell = ws.cell(row=row_num, column=col_idx)
+        cell.value = value
+        if col_letter == 'A' and isinstance(value, datetime.date):
+            cell.number_format = 'D-MMM'
 
 
 @app.route('/append', methods=['POST'])
@@ -227,41 +272,82 @@ def append_forms():
     if not forms:
         return jsonify({'ok': False, 'error': 'No forms provided'}), 400
 
-    year = data.get('year')
-    month = data.get('month')
+    wb, path = get_or_create_workbook()
+    rows_added = 0
 
-    if not year or not month:
-        first_date = forms[0].get('date', '')
-        try:
-            parts = first_date.split('/')
-            month_num = parts[0].zfill(2)
-            year = parts[2]
-            month = MONTH_NAMES.get(month_num, month_num)
-        except (IndexError, AttributeError):
-            now = datetime.datetime.now()
-            year = str(now.year)
-            month = MONTH_NAMES[str(now.month).zfill(2)]
-
-    wb, path = get_or_create_workbook(year)
-    ws, already_existed = get_or_create_sheet(wb, month)
-
-    existing_rows = ws.max_row - 1 if already_existed else 0
-    if existing_rows > 0:
-        print(f'[warn] Sheet {month} already has {existing_rows} rows — appending anyway')
-
+    # Group by month
+    by_month = {}
     for form in forms:
-        row = form_to_row(form)
-        ws.append(row)
+        date = parse_date(form.get('date', ''))
+        month_num = date.month if date else datetime.datetime.now().month
+        by_month.setdefault(month_num, []).append((form, date))
+
+    for month_num, form_date_pairs in by_month.items():
+        month_name = MONTH_NAMES[month_num]
+
+        if month_name in wb.sheetnames:
+            ws = wb[month_name]
+        else:
+            ws = wb.create_sheet(month_name)
+            setup_sheet(ws)
+
+        # Sort by date
+        form_date_pairs.sort(key=lambda x: x[1] or datetime.date.min)
+
+        for form, date in form_date_pairs:
+            values = compute_row_values(form)
+            insert_row = find_insert_row(ws, date)
+
+            # Suppress date if same as row above
+            above_val = ws.cell(row=insert_row - 1, column=1).value
+            if above_val is not None:
+                above_date = above_val.date() if hasattr(above_val, 'date') else parse_date(str(above_val))
+                if date and above_date == date:
+                    values['A'] = None
+
+            insert_form_row(ws, insert_row, values)
+            rows_added += 1
+
+        # Extend table to cover all data rows
+        extend_table(ws, ws.max_row)
 
     wb.save(path)
+    return jsonify({'ok': True, 'rows_added': rows_added, 'file': path})
 
-    return jsonify({
-        'ok': True,
-        'rows_added': len(forms),
-        'file': path,
-        'sheet': month,
-        'existing_rows': existing_rows,
-    })
+
+@app.route('/ocr', methods=['POST'])
+def ocr():
+    data = request.get_json()
+    if not data or 'image' not in data:
+        return jsonify({'ok': False, 'error': 'Missing image'}), 400
+
+    image_data = data['image']
+    if ',' in image_data:
+        image_data = image_data.split(',')[1]
+
+    try:
+        message = client.messages.create(
+            model='claude-haiku-4-5',
+            max_tokens=1024,
+            messages=[{
+                'role': 'user',
+                'content': [
+                    {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/jpeg', 'data': image_data}},
+                    {'type': 'text', 'text': OCR_PROMPT},
+                ],
+            }],
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1]
+            if raw.startswith('json'):
+                raw = raw[4:]
+        fields = json.loads(raw.strip())
+        return jsonify({'ok': True, 'fields': fields})
+
+    except Exception as e:
+        print(f'OCR error: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/status', methods=['GET'])
@@ -276,6 +362,6 @@ def index():
 
 
 if __name__ == '__main__':
-    print('Logbook server starting on http://0.0.0.0:5000')
+    print(f'Logbook server starting on http://0.0.0.0:5000')
     print(f'Data directory: {DATA_DIR}')
     app.run(host='0.0.0.0', port=5000, debug=True)
