@@ -36,9 +36,9 @@ export default function FormDetailScreen() {
     setForm(f => ({ ...f, [field]: value }));
   }
 
-  async function handleStage() {
+  async function handleApprove() {
     if (!id) return;
-    await updateForm(id, { ...form, newDonor, status: 'staged' });
+    await updateForm(id, { ...form, newDonor, status: 'approved' });
     router.back();
   }
 
@@ -174,8 +174,8 @@ export default function FormDetailScreen() {
         <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.stageBtn} onPress={handleStage}>
-          <Text style={styles.stageText}>Stage</Text>
+        <TouchableOpacity style={styles.stageBtn} onPress={handleApprove}>
+          <Text style={styles.stageText}>Approve</Text>
         </TouchableOpacity>
       </View>
 

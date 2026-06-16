@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type FormStatus = 'scanned' | 'needs_review' | 'reviewed' | 'staged';
+export type FormStatus = 'unscanned' | 'needs_review' | 'approved';
 
 export type FormData = {
   id: string;
@@ -54,7 +54,7 @@ export async function addForm(photoUri: string): Promise<FormData> {
   const newForm: FormData = {
     id: Date.now().toString(),
     photoUri,
-    status: 'scanned',
+    status: 'unscanned',
     createdAt: new Date().toISOString(),
     date: '', donor: '', weight: '',
     nonPerishable: '', produce: '', dairy: '', meat: '',

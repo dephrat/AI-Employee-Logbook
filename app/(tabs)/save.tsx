@@ -48,17 +48,17 @@ export default function SaveScreen() {
     }, [])
   );
 
-  const staged = forms.filter(f => f.status === 'staged');
-  const notReviewed = forms.filter(f => f.status === 'scanned' || f.status === 'needs_review');
+  const approved = forms.filter(f => f.status === 'approved');
+  const notReviewed = forms.filter(f => f.status === 'unscanned' || f.status === 'needs_review');
 
   async function handleSave() {
-    if (staged.length === 0) {
-      Alert.alert('Nothing to save', 'Stage at least one form in Review first.');
+    if (approved.length === 0) {
+      Alert.alert('Nothing to save', 'Approve at least one form in Review first.');
       return;
     }
     Alert.alert(
       'Save to spreadsheet?',
-      `${staged.length} form${staged.length !== 1 ? 's' : ''} will be added to the spreadsheet.`,
+      `${approved.length} form${approved.length !== 1 ? 's' : ''} will be added to the spreadsheet.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Save', onPress: doSave },
@@ -72,10 +72,10 @@ export default function SaveScreen() {
       const response = await fetch(`${serverUrl}/append`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ forms: staged }),
+        body: JSON.stringify({ forms: approved }),
       });
       if (!response.ok) throw new Error('Server error');
-      Alert.alert('Saved!', `${staged.length} form${staged.length !== 1 ? 's' : ''} added to spreadsheet.`);
+      Alert.alert('Saved!', `${approved.length} form${approved.length !== 1 ? 's' : ''} added to spreadsheet.`);
       await clearForms();
       router.push('/(tabs)/');
     } catch (e) {
@@ -102,22 +102,22 @@ export default function SaveScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      <Text style={styles.sectionLabel}>Preview — {staged.length} staged form{staged.length !== 1 ? 's' : ''}</Text>
+      <Text style={styles.sectionLabel}>Preview — {approved.length} approved form{approved.length !== 1 ? 's' : ''}</Text>
 
-      {staged.length === 0
-        ? <Text style={styles.empty}>No staged forms yet. Review and stage forms first.</Text>
+      {approved.length === 0
+        ? <Text style={styles.empty}>No approved forms yet. Review and approve forms first.</Text>
         : <ScrollView horizontal style={styles.tableWrap}>
             <View>
               <View style={[styles.tableRow, styles.headerRow]}>
                 {COLUMNS.map(col => <Text key={col} style={[styles.cell, styles.headerCell]}>{col}</Text>)}
               </View>
-              {staged.map(form => (
+              {approved.map(form => (
                 <View key={form.id} style={styles.tableRow}>
                   {getRow(form).map((cell, j) => <Text key={j} style={styles.cell}>{cell}</Text>)}
                 </View>
               ))}
               <View style={[styles.tableRow, styles.totalRow]}>
-                {getTotals(staged).map((cell, j) => <Text key={j} style={[styles.cell, styles.totalCell]}>{cell}</Text>)}
+                {getTotals(approved).map((cell, j) => <Text key={j} style={[styles.cell, styles.totalCell]}>{cell}</Text>)}
               </View>
             </View>
           </ScrollView>
@@ -148,7 +148,7 @@ export default function SaveScreen() {
 
       <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
         <Ionicons name="save-outline" size={18} color="#fff" />
-        <Text style={styles.saveBtnText}>{saving ? 'Saving...' : `Save ${staged.length} form${staged.length !== 1 ? 's' : ''} to spreadsheet`}</Text>
+        <Text style={styles.saveBtnText}>{saving ? 'Saving...' : `Save ${approved.length} form${approved.length !== 1 ? 's' : ''} to spreadsheet`}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard}>
