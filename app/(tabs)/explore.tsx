@@ -13,6 +13,14 @@ const BADGE: Record<string, { label: string; bg: string; color: string }> = {
 
 export default function ReviewScreen() {
   const [forms, setForms] = useState<FormData[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function refresh() {
+    setRefreshing(true);
+    const updated = await getForms();
+    setForms(updated);
+    setRefreshing(false);
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -25,9 +33,15 @@ export default function ReviewScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.summary}>{forms.length} total · {needsReview} need review</Text>
+      <TouchableOpacity style={styles.refreshBtn} onPress={refresh}>
+        <Ionicons name="refresh-outline" size={18} color="#185FA5" />
+        <Text style={styles.refreshText}>Refresh</Text>
+      </TouchableOpacity>
       <FlatList
         data={forms}
         keyExtractor={item => item.id}
+        refreshing={refreshing}
+        onRefresh={refresh}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={<Text style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>No photos yet — go to Camera to start.</Text>}
         renderItem={({ item }) => {
@@ -73,4 +87,6 @@ const styles = StyleSheet.create({
   separator: { height: 0.5, backgroundColor: '#0001' },
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 0.5, borderColor: '#185FA5', borderRadius: 10, padding: 13, marginTop: 8 },
   addBtnText: { color: '#185FA5', fontSize: 15 },
+  refreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
+  refreshText: { color: '#185FA5', fontSize: 14 },
 });
