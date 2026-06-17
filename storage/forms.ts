@@ -95,3 +95,8 @@ export async function saveServerUrl(url: string): Promise<void> {
     console.error('Failed to save server URL:', e);
   }
 }
+
+export async function deleteForm(id: string): Promise<void> {
+  const forms = await getForms();
+  await saveForms(forms.filter(f => f.id !== id));
+}

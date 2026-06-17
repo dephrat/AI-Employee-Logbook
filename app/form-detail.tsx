@@ -1,8 +1,8 @@
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { Alert, View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
-import { getForms, updateForm, FormData } from '../storage/forms';
+import { getForms, updateForm, deleteForm, FormData } from '../storage/forms';
 
 const CATEGORIES: { label: string; field: keyof FormData }[] = [
   { label: 'Non-Perishable', field: 'nonPerishable' },
@@ -40,6 +40,21 @@ export default function FormDetailScreen() {
     if (!id) return;
     await updateForm(id, { ...form, newDonor, status: 'approved' });
     router.back();
+  }
+
+  async function handleDelete() {
+    Alert.alert(
+      'Delete this form?',
+      'The photo and all extracted data will be removed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          if (!id) return;
+          await deleteForm(id as string);
+          router.back();
+        }},
+      ]
+    );
   }
 
   const categorySum = [
@@ -174,10 +189,13 @@ export default function FormDetailScreen() {
         <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.stageBtn} onPress={handleApprove}>
-          <Text style={styles.stageText}>Approve</Text>
+        <TouchableOpacity style={styles.approveBtn} onPress={handleApprove}>
+          <Text style={styles.approveText}>Approve</Text>
         </TouchableOpacity>
       </View>
+      <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+        <Text style={styles.deleteText}>Delete this form</Text>
+      </TouchableOpacity>
 
     </ScrollView>
   );
@@ -209,6 +227,8 @@ const styles = StyleSheet.create({
   btnRow: { flexDirection: 'row', gap: 8 },
   cancelBtn: { flex: 1, padding: 13, borderWidth: 0.5, borderColor: '#185FA5', borderRadius: 10, alignItems: 'center' },
   cancelText: { color: '#185FA5', fontSize: 15 },
-  stageBtn: { flex: 2, padding: 13, backgroundColor: '#185FA5', borderRadius: 10, alignItems: 'center' },
-  stageText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  approveBtn: { flex: 2, padding: 13, backgroundColor: '#185FA5', borderRadius: 10, alignItems: 'center' },
+  approveText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  deleteBtn: { padding: 14, alignItems: 'center' },
+  deleteText: { color: '#A32D2D', fontSize: 14 },
 });
