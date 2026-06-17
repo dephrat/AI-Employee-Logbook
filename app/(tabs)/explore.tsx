@@ -2,12 +2,13 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useState, useCallback } from 'react';
-import { getForms, FormData } from '../../storage/forms';
+import { getForms, runOcr, FormData } from '../../storage/forms';
 
 const BADGE: Record<string, { label: string; bg: string; color: string }> = {
   approved:     { label: 'Approved',     bg: '#EAF3DE', color: '#27500A' },
   needs_review: { label: 'Needs review', bg: '#FAEEDA', color: '#633806' },
   unscanned:    { label: 'Analyzing',    bg: '#F1EFE8', color: '#5F5E5A' },
+  ocr_failed:   { label: 'OCR failed',   bg: '#FDECEA', color: '#8B1A1A' },
 };
 
 export default function ReviewScreen() {
@@ -18,6 +19,17 @@ export default function ReviewScreen() {
     setRefreshing(true);
     const updated = await getForms();
     setForms(updated);
+
+    // Retry any failed OCR
+    const failed = updated.filter(f => f.status === 'ocr_failed');
+    if (failed.length > 0) {
+      failed.forEach(form => {
+        runOcr(form).then(() => {
+          getForms().then(setForms);
+        });
+      });
+    }
+
     setRefreshing(false);
   }
 
@@ -28,11 +40,12 @@ export default function ReviewScreen() {
   );
 
   const unscanned = forms.filter(f => f.status === 'unscanned').length;
+  const ocrFailed = forms.filter(f => f.status === 'ocr_failed').length;
   const needsReview = forms.filter(f => f.status === 'needs_review').length;
   const allOcrDone = unscanned === 0;
 
   function handleActionBtn() {
-    if (allOcrDone) {
+    if (allOcrDone && ocrFailed === 0) {
       const next = forms.find(f => f.status === 'needs_review');
       if (next) router.push({ pathname: '/form-detail', params: { id: next.id } });
     } else {
@@ -40,24 +53,27 @@ export default function ReviewScreen() {
     }
   }
 
-  const showActionBtn = needsReview > 0 || unscanned > 0;
+  const showActionBtn = needsReview > 0 || unscanned > 0 || ocrFailed > 0;
+
+  function actionBtnLabel() {
+    if (ocrFailed > 0) return `Retry ${ocrFailed} failed · refresh`;
+    if (!allOcrDone) return `Refresh — ${forms.length - unscanned} of ${forms.length} analyzed`;
+    return `Review next (${needsReview} remaining)`;
+  }
+
+  function actionBtnIcon() {
+    if (allOcrDone && ocrFailed === 0) return 'arrow-forward-circle-outline';
+    return 'refresh-outline';
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.summary}>{forms.length} total · {needsReview} need review</Text>
 
       {showActionBtn && (
-        <TouchableOpacity style={styles.actionBtn} onPress={handleActionBtn}>
-          <Ionicons
-            name={allOcrDone ? 'arrow-forward-circle-outline' : 'refresh-outline'}
-            size={18}
-            color="#fff"
-          />
-          <Text style={styles.actionBtnText}>
-            {allOcrDone
-              ? `Review next (${needsReview} remaining)`
-              : `Refresh — ${forms.length - unscanned} of ${forms.length} analyzed`}
-          </Text>
+        <TouchableOpacity style={[styles.actionBtn, ocrFailed > 0 && styles.actionBtnError]} onPress={handleActionBtn}>
+          <Ionicons name={actionBtnIcon()} size={18} color="#fff" />
+          <Text style={styles.actionBtnText}>{actionBtnLabel()}</Text>
         </TouchableOpacity>
       )}
 
@@ -74,9 +90,9 @@ export default function ReviewScreen() {
             <TouchableOpacity style={styles.row} onPress={() => router.push({ pathname: '/form-detail', params: { id: item.id } })}>
               <View style={styles.thumb}>
                 <Ionicons
-                  name={item.status === 'needs_review' ? 'warning-outline' : 'document-text-outline'}
+                  name={item.status === 'needs_review' ? 'warning-outline' : item.status === 'ocr_failed' ? 'alert-circle-outline' : 'document-text-outline'}
                   size={22}
-                  color={item.status === 'needs_review' ? '#BA7517' : '#185FA5'}
+                  color={item.status === 'needs_review' ? '#BA7517' : item.status === 'ocr_failed' ? '#8B1A1A' : '#185FA5'}
                 />
               </View>
               <View style={styles.info}>
@@ -98,6 +114,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', padding: 16 },
   summary: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#185FA5', borderRadius: 10, padding: 12, marginBottom: 8 },
+  actionBtnError: { backgroundColor: '#A32D2D' },
   actionBtnText: { color: '#fff', fontSize: 14, fontWeight: '500' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   thumb: { width: 44, height: 44, backgroundColor: '#f5f5f3', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },

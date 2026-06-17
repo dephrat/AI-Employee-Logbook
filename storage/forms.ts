@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
 
-export type FormStatus = 'unscanned' | 'needs_review' | 'approved';
+export type FormStatus = 'unscanned' | 'ocr_failed' | 'needs_review' | 'approved';
 
 export type FormData = {
   id: string;
@@ -77,6 +78,11 @@ export async function clearForms(): Promise<void> {
   await AsyncStorage.removeItem(FORMS_KEY);
 }
 
+export async function deleteForm(id: string): Promise<void> {
+  const forms = await getForms();
+  await saveForms(forms.filter(f => f.id !== id));
+}
+
 const SERVER_URL_KEY = 'logbook_server_url';
 
 export async function getServerUrl(): Promise<string> {
@@ -96,7 +102,27 @@ export async function saveServerUrl(url: string): Promise<void> {
   }
 }
 
-export async function deleteForm(id: string): Promise<void> {
-  const forms = await getForms();
-  await saveForms(forms.filter(f => f.id !== id));
+export async function runOcr(form: FormData): Promise<void> {
+  try {
+    const serverUrl = await getServerUrl();
+    const base64 = await FileSystem.readAsStringAsync(form.photoUri, {
+      encoding: 'base64',
+    });
+
+    const response = await fetch(`${serverUrl}/ocr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 }),
+    });
+
+    const data = await response.json();
+    if (data.ok && data.fields) {
+      await updateForm(form.id, { ...data.fields, status: 'needs_review' });
+    } else {
+      await updateForm(form.id, { status: 'ocr_failed' });
+    }
+  } catch (e) {
+    console.error('OCR failed:', e);
+    await updateForm(form.id, { status: 'ocr_failed' });
+  }
 }
