@@ -10,9 +10,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [forms, setForms] = useState<FormData[]>([]);
+  const [taking, setTaking] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
-
+  
   useFocusEffect(
     useCallback(() => {
       getForms().then(setForms);
@@ -36,12 +37,17 @@ export default function CameraScreen() {
   }
 
   async function takePicture() {
-    if (!cameraRef.current) return;
-    const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
-    if (photo) {
-      const form = await addForm(photo.uri);
-      setForms(prev => [...prev, form]);
-      runOcr(form, photo.uri); // fire and forget
+    if (!cameraRef.current || taking) return;
+    setTaking(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      if (photo) {
+        const form = await addForm(photo.uri);
+        setForms(prev => [...prev, form]);
+        runOcr(form, photo.uri);
+      }
+    } finally {
+      setTaking(false);
     }
   }
 
@@ -110,8 +116,8 @@ export default function CameraScreen() {
             <Text style={styles.doneBtnText}>Review {forms.length} photo{forms.length !== 1 ? 's' : ''}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.shutter} onPress={takePicture}>
-            <View style={styles.shutterInner} />
+          <TouchableOpacity style={styles.shutter} onPress={takePicture} disabled={taking}>
+            <View style={[styles.shutterInner, taking && { backgroundColor: '#aaa' }]} />
           </TouchableOpacity>
         </View>
       </View>
