@@ -2,7 +2,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useState, useCallback } from 'react';
-import { getForms, runOcr, FormData } from '../../storage/forms';
+import { getForms, runOcr, updateForm, FormData } from '../../storage/forms';
 
 const BADGE: Record<string, { label: string; bg: string; color: string }> = {
   approved:     { label: 'Approved',     bg: '#EAF3DE', color: '#27500A' },
@@ -18,16 +18,16 @@ export default function ReviewScreen() {
   async function refresh() {
     setRefreshing(true);
     const updated = await getForms();
-    setForms(updated);
 
-    // Retry any failed OCR
     const failed = updated.filter(f => f.status === 'ocr_failed');
     if (failed.length > 0) {
-      failed.forEach(form => {
-        runOcr(form).then(() => {
-          getForms().then(setForms);
-        });
-      });
+      await Promise.all(failed.map(f => updateForm(f.id, { status: 'unscanned' })));
+      setForms(updated.map(f =>
+        f.status === 'ocr_failed' ? { ...f, status: 'unscanned' as const } : f
+      ));
+      failed.forEach(f => runOcr(f));
+    } else {
+      setForms(updated);
     }
 
     setRefreshing(false);
@@ -56,8 +56,9 @@ export default function ReviewScreen() {
   const showActionBtn = needsReview > 0 || unscanned > 0 || ocrFailed > 0;
 
   function actionBtnLabel() {
-    if (ocrFailed > 0) return `Retry ${ocrFailed} failed · refresh`;
-    if (!allOcrDone) return `Refresh — ${forms.length - unscanned} of ${forms.length} analyzed`;
+    if (ocrFailed > 0 && unscanned > 0) return `Retry & Refresh · ${ocrFailed} failed, ${unscanned} analyzing`;
+    if (ocrFailed > 0) return `Retry · ${ocrFailed} failed`;
+    if (!allOcrDone) return `Refresh · ${forms.length - unscanned} of ${forms.length} analyzed`;
     return `Review next (${needsReview} remaining)`;
   }
 
@@ -71,7 +72,10 @@ export default function ReviewScreen() {
       <Text style={styles.summary}>{forms.length} total · {needsReview} need review</Text>
 
       {showActionBtn && (
-        <TouchableOpacity style={[styles.actionBtn, ocrFailed > 0 && styles.actionBtnError]} onPress={handleActionBtn}>
+        <TouchableOpacity
+          style={[styles.actionBtn, ocrFailed > 0 && styles.actionBtnError]}
+          onPress={handleActionBtn}
+        >
           <Ionicons name={actionBtnIcon()} size={18} color="#fff" />
           <Text style={styles.actionBtnText}>{actionBtnLabel()}</Text>
         </TouchableOpacity>
@@ -87,12 +91,23 @@ export default function ReviewScreen() {
         renderItem={({ item }) => {
           const badge = BADGE[item.status] || BADGE.unscanned;
           return (
-            <TouchableOpacity style={styles.row} onPress={() => router.push({ pathname: '/form-detail', params: { id: item.id } })}>
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => router.push({ pathname: '/form-detail', params: { id: item.id } })}
+            >
               <View style={styles.thumb}>
                 <Ionicons
-                  name={item.status === 'needs_review' ? 'warning-outline' : item.status === 'ocr_failed' ? 'alert-circle-outline' : 'document-text-outline'}
+                  name={
+                    item.status === 'needs_review' ? 'warning-outline' :
+                    item.status === 'ocr_failed' ? 'alert-circle-outline' :
+                    'document-text-outline'
+                  }
                   size={22}
-                  color={item.status === 'needs_review' ? '#BA7517' : item.status === 'ocr_failed' ? '#8B1A1A' : '#185FA5'}
+                  color={
+                    item.status === 'needs_review' ? '#BA7517' :
+                    item.status === 'ocr_failed' ? '#8B1A1A' :
+                    '#185FA5'
+                  }
                 />
               </View>
               <View style={styles.info}>
