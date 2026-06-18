@@ -2,7 +2,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'rea
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
-import { getForms, FormData } from '../storage/forms';
+import { getSavedFormsSummary, FormData } from '../storage/forms';
 
 const CATEGORIES: { label: string; field: keyof FormData }[] = [
   { label: 'Non-Perishable', field: 'nonPerishable' },
@@ -22,7 +22,7 @@ export default function FormDetailReadonlyScreen() {
   const [showContact, setShowContact] = useState(false);
 
   useEffect(() => {
-    getForms().then(forms => {
+    getSavedFormsSummary().then(forms => {
       const found = forms.find(f => f.id === id);
       if (found) setForm(found);
     });
@@ -71,8 +71,6 @@ export default function FormDetailReadonlyScreen() {
           <Field label="Other" value={form.other} />
         ) : null}
       </View>
-
-      {(form.contactName || form.contactEmail || form.contactPhone) && (
         <View style={styles.card}>
           <TouchableOpacity style={styles.collapseHeader} onPress={() => setShowContact(v => !v)}>
             <Text style={styles.collapseTitle}>Contact info</Text>
@@ -88,8 +86,6 @@ export default function FormDetailReadonlyScreen() {
             </View>
           )}
         </View>
-      )}
-
       <TouchableOpacity style={styles.backBtn} onPress={() => router.replace('/save-confirmation')}>
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
