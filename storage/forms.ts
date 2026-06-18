@@ -68,10 +68,15 @@ export async function addForm(photoUri: string): Promise<FormData> {
   return newForm;
 }
 
+let writeQueue = Promise.resolve();
+
 export async function updateForm(id: string, updates: Partial<FormData>): Promise<void> {
-  const forms = await getForms();
-  const updated = forms.map(f => f.id === id ? { ...f, ...updates } : f);
-  await saveForms(updated);
+  writeQueue = writeQueue.then(async () => {
+    const forms = await getForms();
+    const updated = forms.map(f => f.id === id ? { ...f, ...updates } : f);
+    await saveForms(updated);
+  });
+  await writeQueue;
 }
 
 export async function clearForms(): Promise<void> {
@@ -109,11 +114,16 @@ export async function runOcr(form: FormData): Promise<void> {
       encoding: 'base64',
     });
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch(`${serverUrl}/ocr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: base64 }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     const data = await response.json();
     if (data.ok && data.fields) {
