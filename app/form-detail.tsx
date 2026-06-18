@@ -38,8 +38,17 @@ export default function FormDetailScreen() {
 
   async function handleApprove() {
     if (!id) return;
-    await updateForm(id, { ...form, newDonor, status: 'approved' });
-    router.back();
+    await updateForm(id as string, { ...form, newDonor, status: 'approved' });
+    
+    // Find next needs_review form
+    const allForms = await getForms();
+    const next = allForms.find(f => f.id !== id && f.status === 'needs_review');
+    
+    if (next) {
+      router.replace({ pathname: '/form-detail', params: { id: next.id } });
+    } else {
+      router.back();
+    }
   }
 
   async function handleDelete() {
