@@ -84,8 +84,11 @@ export async function clearForms(): Promise<void> {
 }
 
 export async function deleteForm(id: string): Promise<void> {
-  const forms = await getForms();
-  await saveForms(forms.filter(f => f.id !== id));
+  writeQueue = writeQueue.then(async () => {
+    const forms = await getForms();
+    await saveForms(forms.filter(f => f.id !== id));
+  });
+  await writeQueue;
 }
 
 const SERVER_URL_KEY = 'logbook_server_url';
