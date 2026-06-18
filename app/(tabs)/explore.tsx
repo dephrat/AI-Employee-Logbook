@@ -1,7 +1,7 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { getForms, runOcr, updateForm, FormData } from '../../storage/forms';
 
 const BADGE: Record<string, { label: string; bg: string; color: string }> = {
@@ -14,6 +14,7 @@ const BADGE: Record<string, { label: string; bg: string; color: string }> = {
 export default function ReviewScreen() {
   const [forms, setForms] = useState<FormData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const lastActionRef = useRef(0);
 
   async function refresh() {
     setRefreshing(true);
@@ -45,6 +46,10 @@ export default function ReviewScreen() {
   const allOcrDone = unscanned === 0;
 
   function handleActionBtn() {
+    const now = Date.now();
+    if (now - lastActionRef.current < 800) return;
+    lastActionRef.current = now;
+    
     if (allOcrDone && ocrFailed === 0) {
       const next = forms.find(f => f.status === 'needs_review');
       if (next) router.push({ pathname: '/form-detail', params: { id: next.id } });
