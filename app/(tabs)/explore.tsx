@@ -49,8 +49,10 @@ export default function ReviewScreen() {
     const now = Date.now();
     if (now - lastActionRef.current < 800) return;
     lastActionRef.current = now;
-    
-    if (allOcrDone && ocrFailed === 0) {
+
+    if (allOcrDone && ocrFailed === 0 && needsReview === 0 && forms.filter(f => f.status === 'approved').length > 0) {
+      router.push('/(tabs)/save');
+    } else if (allOcrDone && ocrFailed === 0 && needsReview > 0) {
       const next = forms.find(f => f.status === 'needs_review');
       if (next) router.push({ pathname: '/form-detail', params: { id: next.id } });
     } else {
@@ -65,10 +67,14 @@ export default function ReviewScreen() {
     if (ocrFailed > 0) return `Retry · ${ocrFailed} failed`;
     if (!allOcrDone) return `Refresh · ${forms.length - unscanned} of ${forms.length} analyzed`;
     if (needsReview > 0) return `Review next (${needsReview} remaining)`;
+    const approvedCount = forms.filter(f => f.status === 'approved').length;
+    if (approvedCount > 0) return `Save ${approvedCount} form${approvedCount !== 1 ? 's' : ''} →`;
     return 'Refresh';
   }
 
   function actionBtnIcon() {
+    const approvedCount = forms.filter(f => f.status === 'approved').length;
+    if (allOcrDone && ocrFailed === 0 && needsReview === 0 && approvedCount > 0) return 'save-outline';
     if (allOcrDone && ocrFailed === 0 && needsReview > 0) return 'arrow-forward-circle-outline';
     return 'refresh-outline';
   }
