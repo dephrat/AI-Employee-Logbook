@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { getSavedFormsSummary, FormData } from '../storage/forms';
@@ -20,6 +20,11 @@ export default function FormDetailReadonlyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [form, setForm] = useState<Partial<FormData>>({});
   const [showContact, setShowContact] = useState(false);
+  const navigation = useNavigation();
+  
+  useEffect(() => {
+    navigation.setOptions({ headerBackVisible: false });
+  }, []);
 
   useEffect(() => {
     getSavedFormsSummary().then(forms => {
