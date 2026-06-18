@@ -58,17 +58,18 @@ export default function ReviewScreen() {
     }
   }
 
-  const showActionBtn = needsReview > 0 || unscanned > 0 || ocrFailed > 0;
+  const showActionBtn = true;
 
   function actionBtnLabel() {
     if (ocrFailed > 0 && unscanned > 0) return `Retry & Refresh · ${ocrFailed} failed, ${unscanned} analyzing`;
     if (ocrFailed > 0) return `Retry · ${ocrFailed} failed`;
     if (!allOcrDone) return `Refresh · ${forms.length - unscanned} of ${forms.length} analyzed`;
-    return `Review next (${needsReview} remaining)`;
+    if (needsReview > 0) return `Review next (${needsReview} remaining)`;
+    return 'Refresh';
   }
 
   function actionBtnIcon() {
-    if (allOcrDone && ocrFailed === 0) return 'arrow-forward-circle-outline';
+    if (allOcrDone && ocrFailed === 0 && needsReview > 0) return 'arrow-forward-circle-outline';
     return 'refresh-outline';
   }
 
@@ -84,6 +85,12 @@ export default function ReviewScreen() {
           <Ionicons name={actionBtnIcon()} size={18} color="#fff" />
           <Text style={styles.actionBtnText}>{actionBtnLabel()}</Text>
         </TouchableOpacity>
+      )}
+
+      {unscanned > 0 && (
+        <Text style={styles.analyzingHint}>
+          {unscanned} photo{unscanned !== 1 ? 's' : ''} still analyzing. Tap Refresh to see progress.
+        </Text>
       )}
 
       <FlatList
@@ -145,4 +152,5 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '500' },
   separator: { height: 0.5, backgroundColor: '#0001' },
   empty: { color: '#aaa', textAlign: 'center', marginTop: 40 },
+  analyzingHint: { fontSize: 13, color: '#888', textAlign: 'center', paddingVertical: 6 },
 });
