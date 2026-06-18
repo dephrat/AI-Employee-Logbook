@@ -1,4 +1,4 @@
-import { Alert, View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { Alert, View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Image, Modal } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -21,6 +21,7 @@ export default function FormDetailScreen() {
   const [form, setForm] = useState<Partial<FormData>>({});
   const [showContact, setShowContact] = useState(false);
   const [newDonor, setNewDonor] = useState<'yes' | 'no' | null>(null);
+  const [photoExpanded, setPhotoExpanded] = useState(false);
 
   useEffect(() => {
     getForms().then(forms => {
@@ -75,145 +76,162 @@ export default function FormDetailScreen() {
   const weightMismatch = totalWeight > 0 && categorySum > 0 && Math.abs(categorySum - totalWeight) > 0.5;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
       {form.photoUri && (
-        <Image
-          source={{ uri: form.photoUri }}
-          style={styles.photo}
-          resizeMode="contain"
-        />
+        <>
+          <TouchableOpacity onPress={() => setPhotoExpanded(true)} style={styles.photoThumbWrap}>
+            <Image
+              source={{ uri: form.photoUri }}
+              style={styles.photoThumb}
+              resizeMode="cover"
+            />
+            <View style={styles.photoHint}>
+              <Ionicons name="expand-outline" size={18} color="#fff" />
+            </View>
+          </TouchableOpacity>
+
+          <Modal visible={photoExpanded} transparent animationType="fade">
+            <View style={styles.photoModal}>
+              <TouchableOpacity style={{ flex: 1 }} onPress={() => setPhotoExpanded(false)} activeOpacity={1}>
+                <Image source={{ uri: form.photoUri }} style={styles.photoFull} resizeMode="contain" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.photoCloseBtn} onPress={() => setPhotoExpanded(false)}>
+                <Ionicons name="contract-outline" size={22} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 13 }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </Modal>
+        </>
       )}
 
-      {/* Donation info */}
-      <View style={styles.card}>
-        <Text style={styles.sectionLabel}>Donation info</Text>
-        <View style={styles.fields}>
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Date received</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="mm/dd/yyyy"
-              value={form.date || ''}
-              onChangeText={v => setField('date', v)}
-            />
-          </View>
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Donor / Event</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. SDM, Port BIC, Anon"
-              value={form.donor || ''}
-              onChangeText={v => setField('donor', v)}
-            />
-          </View>
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Total weight (lbs)</Text>
-            <TextInput
-              style={[styles.input, weightMismatch && styles.inputWarning]}
-              placeholder="0"
-              keyboardType="numeric"
-              value={form.weight || ''}
-              onChangeText={v => setField('weight', v)}
-            />
-            {weightMismatch && (
-              <Text style={styles.weightWarning}>
-                Category weights sum to {categorySum} — doesn't match total of {totalWeight}
-              </Text>
-            )}
-          </View>
-        </View>
-      </View>
-
-      {/* Category weights */}
-      <View style={styles.card}>
-        <Text style={styles.sectionLabel}>Category weights</Text>
-        {CATEGORIES.map(({ label, field }) => (
-          <View key={label} style={styles.catRow}>
-            <Text style={styles.catLabel}>{label}</Text>
-            <TextInput
-              style={styles.catInput}
-              placeholder="—"
-              keyboardType="numeric"
-              value={(form[field] as string) || ''}
-              onChangeText={v => setField(field, v)}
-            />
-          </View>
-        ))}
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Other</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Describe other items..."
-            value={form.other || ''}
-            onChangeText={v => setField('other', v)}
-          />
-        </View>
-      </View>
-
-      {/* Contact info */}
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.collapseHeader} onPress={() => setShowContact(v => !v)}>
-          <Text style={styles.collapseTitle}>Contact info <Text style={styles.optional}>(optional)</Text></Text>
-          <Ionicons name={showContact ? 'chevron-up' : 'chevron-down'} size={18} color="#888" />
-        </TouchableOpacity>
-        {showContact && (
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        {/* Donation info */}
+        <View style={styles.card}>
+          <Text style={styles.sectionLabel}>Donation info</Text>
           <View style={styles.fields}>
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Name / Business</Text>
-              <TextInput style={styles.input} placeholder="" value={form.contactName || ''} onChangeText={v => setField('contactName', v)} />
+              <Text style={styles.fieldLabel}>Date received</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="mm/dd/yyyy"
+                value={form.date || ''}
+                onChangeText={v => setField('date', v)}
+              />
             </View>
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Address</Text>
-              <TextInput style={styles.input} placeholder="" value={form.contactAddress || ''} onChangeText={v => setField('contactAddress', v)} />
+              <Text style={styles.fieldLabel}>Donor / Event</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. SDM, Port BIC, Anon"
+                value={form.donor || ''}
+                onChangeText={v => setField('donor', v)}
+              />
             </View>
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Email</Text>
-              <TextInput style={styles.input} placeholder="" keyboardType="email-address" value={form.contactEmail || ''} onChangeText={v => setField('contactEmail', v)} />
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Phone</Text>
-              <TextInput style={styles.input} placeholder="" keyboardType="phone-pad" value={form.contactPhone || ''} onChangeText={v => setField('contactPhone', v)} />
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>New donor?</Text>
-              <View style={styles.ynRow}>
-                <TouchableOpacity
-                  style={[styles.ynBtn, newDonor === 'yes' && styles.ynBtnSelected]}
-                  onPress={() => setNewDonor('yes')}>
-                  <Text style={[styles.ynText, newDonor === 'yes' && styles.ynTextSelected]}>Yes</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.ynBtn, newDonor === 'no' && styles.ynBtnSelected]}
-                  onPress={() => setNewDonor('no')}>
-                  <Text style={[styles.ynText, newDonor === 'no' && styles.ynTextSelected]}>No</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.fieldLabel}>Total weight (lbs)</Text>
+              <TextInput
+                style={[styles.input, weightMismatch && styles.inputWarning]}
+                placeholder="0"
+                keyboardType="numeric"
+                value={form.weight || ''}
+                onChangeText={v => setField('weight', v)}
+              />
+              {weightMismatch && (
+                <Text style={styles.weightWarning}>
+                  Category weights sum to {categorySum} — doesn't match total of {totalWeight}
+                </Text>
+              )}
             </View>
           </View>
-        )}
-      </View>
+        </View>
 
-      {/* Buttons */}
-      <View style={styles.btnRow}>
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.approveBtn} onPress={handleApprove}>
-          <Text style={styles.approveText}>Approve</Text>
-        </TouchableOpacity>
-      </View>
-      <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-        <Text style={styles.deleteText}>Delete this form</Text>
-      </TouchableOpacity>
+        {/* Category weights */}
+        <View style={styles.card}>
+          <Text style={styles.sectionLabel}>Category weights</Text>
+          {CATEGORIES.map(({ label, field }) => (
+            <View key={label} style={styles.catRow}>
+              <Text style={styles.catLabel}>{label}</Text>
+              <TextInput
+                style={styles.catInput}
+                placeholder="—"
+                keyboardType="numeric"
+                value={(form[field] as string) || ''}
+                onChangeText={v => setField(field, v)}
+              />
+            </View>
+          ))}
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Other</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Describe other items..."
+              value={form.other || ''}
+              onChangeText={v => setField('other', v)}
+            />
+          </View>
+        </View>
 
-    </ScrollView>
+        {/* Contact info */}
+        <View style={styles.card}>
+          <TouchableOpacity style={styles.collapseHeader} onPress={() => setShowContact(v => !v)}>
+            <Text style={styles.collapseTitle}>Contact info <Text style={styles.optional}>(optional)</Text></Text>
+            <Ionicons name={showContact ? 'chevron-up' : 'chevron-down'} size={18} color="#888" />
+          </TouchableOpacity>
+          {showContact && (
+            <View style={styles.fields}>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Name / Business</Text>
+                <TextInput style={styles.input} placeholder="" value={form.contactName || ''} onChangeText={v => setField('contactName', v)} />
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Address</Text>
+                <TextInput style={styles.input} placeholder="" value={form.contactAddress || ''} onChangeText={v => setField('contactAddress', v)} />
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Email</Text>
+                <TextInput style={styles.input} placeholder="" keyboardType="email-address" value={form.contactEmail || ''} onChangeText={v => setField('contactEmail', v)} />
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Phone</Text>
+                <TextInput style={styles.input} placeholder="" keyboardType="phone-pad" value={form.contactPhone || ''} onChangeText={v => setField('contactPhone', v)} />
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>New donor?</Text>
+                <View style={styles.ynRow}>
+                  <TouchableOpacity
+                    style={[styles.ynBtn, newDonor === 'yes' && styles.ynBtnSelected]}
+                    onPress={() => setNewDonor('yes')}>
+                    <Text style={[styles.ynText, newDonor === 'yes' && styles.ynTextSelected]}>Yes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.ynBtn, newDonor === 'no' && styles.ynBtnSelected]}
+                    onPress={() => setNewDonor('no')}>
+                    <Text style={[styles.ynText, newDonor === 'no' && styles.ynTextSelected]}>No</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Buttons */}
+        <View style={styles.btnRow}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.approveBtn} onPress={handleApprove}>
+            <Text style={styles.approveText}>Approve</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+          <Text style={styles.deleteText}>Delete this form</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
-  photo: { width: '100%', height: 300, borderRadius: 12, backgroundColor: '#111' },
   card: { borderWidth: 0.5, borderColor: '#0002', borderRadius: 12, padding: 14, gap: 10 },
   sectionLabel: { fontSize: 12, fontWeight: '500', color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 },
   fields: { gap: 10 },
@@ -240,4 +258,13 @@ const styles = StyleSheet.create({
   approveText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   deleteBtn: { padding: 14, alignItems: 'center' },
   deleteText: { color: '#A32D2D', fontSize: 14 },
+  container: { flex: 1, backgroundColor: '#fff' },
+  scroll: { flex: 1 },
+  content: { padding: 16, gap: 12, paddingBottom: 40 },
+  photoThumb: { width: '100%', height: 120, backgroundColor: '#111' },
+  photoThumbWrap: { position: 'relative' },
+  photoHint: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 6, padding: 6 },
+  photoModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
+  photoFull: { width: '100%', flex: 1 },
+  photoCloseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, backgroundColor: 'rgba(0,0,0,0.5)' },
 });
