@@ -2,7 +2,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet 
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { clearForms, getForms, FormData, getServerUrl, saveServerUrl } from '../../storage/forms';
+import { clearForms, getForms, deleteForm, FormData, getServerUrl, saveServerUrl, setSavedFormsSummary } from '../../storage/forms';
 import { router } from 'expo-router';
 
 const COLUMNS = ['Date', 'Source', 'Non-Per.', 'Produce', 'Dairy', 'Meat', 'Baked Goods', 'Pet Food', 'Toys', 'Hygiene', 'School Sup.', 'Total'];
@@ -12,19 +12,11 @@ function getRow(form: FormData): string[] {
     form.nonPerishable, form.produce, form.dairy, form.meat,
     form.bakedGoods, form.petFood, form.toys, form.hygiene, form.schoolSupplies
   ].reduce((sum, v) => sum + (parseFloat(v || '0') || 0), 0);
-
   return [
-    form.date || '—',
-    form.donor || '—',
-    form.nonPerishable || '',
-    form.produce || '',
-    form.dairy || '',
-    form.meat || '',
-    form.bakedGoods || '',
-    form.petFood || '',
-    form.toys || '',
-    form.hygiene || '',
-    form.schoolSupplies || '',
+    form.date || '—', form.donor || '—',
+    form.nonPerishable || '', form.produce || '', form.dairy || '',
+    form.meat || '', form.bakedGoods || '', form.petFood || '',
+    form.toys || '', form.hygiene || '', form.schoolSupplies || '',
     total > 0 ? total.toString() : '—',
   ];
 }
@@ -75,9 +67,9 @@ export default function SaveScreen() {
         body: JSON.stringify({ forms: approved }),
       });
       if (!response.ok) throw new Error('Server error');
-      Alert.alert('Saved!', `${approved.length} form${approved.length !== 1 ? 's' : ''} added to spreadsheet.`);
-      await clearForms();
-      router.push('/(tabs)/');
+      await setSavedFormsSummary(approved);
+      await Promise.all(approved.map(f => deleteForm(f.id)));
+      router.push('/save-confirmation');
     } catch (e) {
       Alert.alert('Error', 'Could not reach the server. Check the URL and try again.');
     } finally {
@@ -101,7 +93,6 @@ export default function SaveScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-
       <Text style={styles.sectionLabel}>Preview — {approved.length} approved form{approved.length !== 1 ? 's' : ''}</Text>
 
       {approved.length === 0
@@ -154,7 +145,6 @@ export default function SaveScreen() {
       <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard}>
         <Text style={styles.discardText}>Discard unsaved changes</Text>
       </TouchableOpacity>
-
     </ScrollView>
   );
 }

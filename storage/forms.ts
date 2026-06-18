@@ -136,3 +136,26 @@ export async function runOcr(form: FormData): Promise<void> {
     await updateForm(form.id, { status: 'ocr_failed' });
   }
 }
+
+const SAVED_FORMS_KEY = 'logbook_saved_forms';
+
+export async function setSavedFormsSummary(forms: FormData[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SAVED_FORMS_KEY, JSON.stringify(forms));
+  } catch (e) {
+    console.error('Failed to save summary:', e);
+  }
+}
+
+export async function getSavedFormsSummary(): Promise<FormData[]> {
+  try {
+    const raw = await AsyncStorage.getItem(SAVED_FORMS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function clearSavedFormsSummary(): Promise<void> {
+  await AsyncStorage.removeItem(SAVED_FORMS_KEY);
+}
