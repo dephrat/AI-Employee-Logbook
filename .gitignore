@@ -45,3 +45,4 @@ app-example
 
 # common sense
 .env
+server/data/
