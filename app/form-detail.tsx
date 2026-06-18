@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { getForms, updateForm, deleteForm, FormData } from '../storage/forms';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const CATEGORIES: { label: string; field: keyof FormData }[] = [
   { label: 'Non-Perishable', field: 'nonPerishable' },
@@ -22,6 +23,7 @@ export default function FormDetailScreen() {
   const [showContact, setShowContact] = useState(false);
   const [newDonor, setNewDonor] = useState<'yes' | 'no' | null>(null);
   const [photoExpanded, setPhotoExpanded] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     getForms().then(forms => {
@@ -39,6 +41,11 @@ export default function FormDetailScreen() {
 
   async function handleApprove() {
     if (!id) return;
+    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    if (form.date && !dateRegex.test(form.date)) {
+      Alert.alert('Invalid date', 'Please use mm/dd/yyyy format or use the calendar picker.');
+      return;
+    }
     await updateForm(id as string, { ...form, newDonor, status: 'approved' });
     
     // Find next needs_review form
@@ -111,12 +118,47 @@ export default function FormDetailScreen() {
           <View style={styles.fields}>
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Date received</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="mm/dd/yyyy"
-                value={form.date || ''}
-                onChangeText={v => setField('date', v)}
-              />
+              <View style={styles.dateRow}>
+                <TextInput
+                  style={[styles.input, styles.dateInput]}
+                  placeholder="mm/dd/yyyy"
+                  value={form.date || ''}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  onChangeText={v => {
+                    const nums = v.replace(/\D/g, '');
+                    let formatted = nums;
+                    if (nums.length >= 3) formatted = nums.slice(0, 2) + '/' + nums.slice(2);
+                    if (nums.length >= 5) formatted = nums.slice(0, 2) + '/' + nums.slice(2, 4) + '/' + nums.slice(4, 8);
+                    setField('date', formatted);
+                  }}
+                />
+                <TouchableOpacity style={styles.calendarBtn} onPress={() => setShowDatePicker(true)}>
+                  <Ionicons name="calendar-outline" size={20} color="#185FA5" />
+                </TouchableOpacity>
+              </View>
+              {showDatePicker && (
+                <DateTimePicker
+                  mode="date"
+                  display="spinner"
+                  value={(() => {
+                    if (form.date && /^\d{2}\/\d{2}\/\d{4}$/.test(form.date)) {
+                      const [mm, dd, yyyy] = form.date.split('/');
+                      return new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
+                    }
+                    return new Date();
+                  })()}
+                  onChange={(event, date) => {
+                    setShowDatePicker(false);
+                    if (date) {
+                      const mm = String(date.getMonth() + 1).padStart(2, '0');
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      const yyyy = date.getFullYear();
+                      setField('date', `${mm}/${dd}/${yyyy}`);
+                    }
+                  }}
+                />
+              )}
             </View>
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Donor / Event</Text>
@@ -267,4 +309,7 @@ const styles = StyleSheet.create({
   photoModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
   photoFull: { width: '100%', flex: 1 },
   photoCloseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, backgroundColor: 'rgba(0,0,0,0.5)' },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dateInput: { flex: 1 },
+  calendarBtn: { padding: 9, borderWidth: 0.5, borderColor: '#0002', borderRadius: 8 },
 });
