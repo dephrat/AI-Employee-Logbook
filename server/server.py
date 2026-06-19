@@ -25,8 +25,6 @@ client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
-FILENAME = 'Port Cares In 2026.xlsx'
-
 # Column order matches Port Cares format
 COLUMNS = [
     ('A', 'DATE',           'date'),
@@ -105,12 +103,12 @@ Rules:
 """
 
 
-def get_xlsx_path():
-    return os.path.join(DATA_DIR, FILENAME)
+def get_xlsx_path(year: str) -> str:
+    return os.path.join(DATA_DIR, f'Port Cares In {year}.xlsx')
 
 
-def get_or_create_workbook():
-    path = get_xlsx_path()
+def get_or_create_workbook(year: str):
+    path = get_xlsx_path(year)
     if os.path.exists(path):
         return load_workbook(path), path
     wb = Workbook()
@@ -272,48 +270,51 @@ def append_forms():
     if not forms:
         return jsonify({'ok': False, 'error': 'No forms provided'}), 400
 
-    wb, path = get_or_create_workbook()
     rows_added = 0
+    new_files = []
 
-    # Group by month
-    by_month = {}
+    # Group by year and month
+    by_year_month = {}
     for form in forms:
         date = parse_date(form.get('date', ''))
+        year = str(date.year) if date else str(datetime.datetime.now().year)
         month_num = date.month if date else datetime.datetime.now().month
-        by_month.setdefault(month_num, []).append((form, date))
+        by_year_month.setdefault(year, {}).setdefault(month_num, []).append((form, date))
 
-    for month_num, form_date_pairs in by_month.items():
-        month_name = MONTH_NAMES[month_num]
+    for year, by_month in by_year_month.items():
+        file_existed = os.path.exists(get_xlsx_path(year))
+        if not file_existed:
+            new_files.append(year)
+        wb, path = get_or_create_workbook(year)
 
-        if month_name in wb.sheetnames:
-            ws = wb[month_name]
-        else:
-            ws = wb.create_sheet(month_name)
-            setup_sheet(ws)
+        for month_num, form_date_pairs in by_month.items():
+            month_name = MONTH_NAMES[month_num]
 
-        # Sort by date
-        form_date_pairs.sort(key=lambda x: x[1] or datetime.date.min)
+            if month_name in wb.sheetnames:
+                ws = wb[month_name]
+            else:
+                ws = wb.create_sheet(month_name)
+                setup_sheet(ws)
 
-        for form, date in form_date_pairs:
-            values = compute_row_values(form)
-            insert_row = find_insert_row(ws, date)
+            form_date_pairs.sort(key=lambda x: x[1] or datetime.date.min)
 
-            # Suppress date if same as row above
-            above_val = ws.cell(row=insert_row - 1, column=1).value
-            if above_val is not None:
-                above_date = above_val.date() if hasattr(above_val, 'date') else parse_date(str(above_val))
-                if date and above_date == date:
-                    values['A'] = None
+            for form, date in form_date_pairs:
+                values = compute_row_values(form)
+                insert_row = find_insert_row(ws, date)
 
-            insert_form_row(ws, insert_row, values)
-            rows_added += 1
+                above_val = ws.cell(row=insert_row - 1, column=1).value
+                if above_val is not None:
+                    above_date = above_val.date() if hasattr(above_val, 'date') else parse_date(str(above_val))
+                    if date and above_date == date:
+                        values['A'] = None
 
-        # Extend table to cover all data rows
-        extend_table(ws, ws.max_row)
+                insert_form_row(ws, insert_row, values)
+                rows_added += 1
 
-    wb.save(path)
-    return jsonify({'ok': True, 'rows_added': rows_added, 'file': path})
+            extend_table(ws, ws.max_row)
+        wb.save(path)
 
+    return jsonify({'ok': True, 'rows_added': rows_added, 'new_files': new_files})
 
 @app.route('/ocr', methods=['POST'])
 def ocr():

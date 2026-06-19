@@ -67,11 +67,26 @@ export default function SaveScreen() {
         body: JSON.stringify({ forms: approved }),
       });
       if (!response.ok) throw new Error('Server error');
+      const result = await response.json();
+
+      if (result.new_files && result.new_files.length > 0) {
+        const msg = result.new_files.length === 1
+          ? `No spreadsheet exists for ${result.new_files[0]}. Are you sure you want to create one?`
+          : `No spreadsheets exist for ${result.new_files.join(', ')}. Are you sure you want to create them?`;
+
+        await new Promise<void>((resolve, reject) => {
+          Alert.alert('New spreadsheet', msg, [
+            { text: 'Cancel', style: 'cancel', onPress: () => reject() },
+            { text: 'Continue', onPress: () => resolve() },
+          ]);
+        });
+      }
+
       await setSavedFormsSummary(approved);
       await Promise.all(approved.map(f => deleteForm(f.id)));
       router.push('/save-confirmation');
     } catch (e) {
-      Alert.alert('Error', 'Could not reach the server. Check the URL and try again.');
+      if (e) Alert.alert('Error', 'Could not reach the server. Check the URL and try again.');
     } finally {
       setSaving(false);
     }
