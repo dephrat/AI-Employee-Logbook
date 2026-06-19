@@ -28,6 +28,28 @@ function getTotals(forms: FormData[]): string[] {
   return ['Total', '', ...sums.map(s => s > 0 ? s.toString() : ''), grand > 0 ? grand.toString() : '—'];
 }
 
+function groupByMonthYear(forms: FormData[]) {
+  const groups: Record<string, FormData[]> = {};
+  forms.forEach(form => {
+    const parts = form.date?.split('/');
+    if (parts?.length === 3) {
+      const key = `${parts[0]}/${parts[2]}`; // MM/YYYY
+      groups[key] = groups[key] || [];
+      groups[key].push(form);
+    } else {
+      groups['Unknown'] = groups['Unknown'] || [];
+      groups['Unknown'].push(form);
+    }
+  });
+  return groups;
+}
+
+const MONTH_LABELS: Record<string, string> = {
+  '01':'January','02':'February','03':'March','04':'April',
+  '05':'May','06':'June','07':'July','08':'August',
+  '09':'September','10':'October','11':'November','12':'December',
+};
+
 export default function SaveScreen() {
   const [forms, setForms] = useState<FormData[]>([]);
   const [serverUrl, setServerUrl] = useState('http://192.168.1.100:5000');
@@ -112,21 +134,32 @@ export default function SaveScreen() {
 
       {approved.length === 0
         ? <Text style={styles.empty}>No approved forms yet. Review and approve forms first.</Text>
-        : <ScrollView horizontal style={styles.tableWrap}>
-            <View>
-              <View style={[styles.tableRow, styles.headerRow]}>
-                {COLUMNS.map(col => <Text key={col} style={[styles.cell, styles.headerCell]}>{col}</Text>)}
-              </View>
-              {approved.map(form => (
-                <View key={form.id} style={styles.tableRow}>
-                  {getRow(form).map((cell, j) => <Text key={j} style={styles.cell}>{cell}</Text>)}
+        : Object.entries(groupByMonthYear(approved))
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, group]) => {
+              const [mm, yyyy] = key.split('/');
+              const label = key === 'Unknown' ? 'Unknown date' : `${MONTH_LABELS[mm] || mm} ${yyyy}`;
+              return (
+                <View key={key}>
+                  <Text style={styles.groupLabel}>{label}</Text>
+                  <ScrollView horizontal style={styles.tableWrap}>
+                    <View>
+                      <View style={[styles.tableRow, styles.headerRow]}>
+                        {COLUMNS.map(col => <Text key={col} style={[styles.cell, styles.headerCell]}>{col}</Text>)}
+                      </View>
+                      {group.map(form => (
+                        <View key={form.id} style={styles.tableRow}>
+                          {getRow(form).map((cell, j) => <Text key={j} style={styles.cell}>{cell}</Text>)}
+                        </View>
+                      ))}
+                      <View style={[styles.tableRow, styles.totalRow]}>
+                        {getTotals(group).map((cell, j) => <Text key={j} style={[styles.cell, styles.totalCell]}>{cell}</Text>)}
+                      </View>
+                    </View>
+                  </ScrollView>
                 </View>
-              ))}
-              <View style={[styles.tableRow, styles.totalRow]}>
-                {getTotals(approved).map((cell, j) => <Text key={j} style={[styles.cell, styles.totalCell]}>{cell}</Text>)}
-              </View>
-            </View>
-          </ScrollView>
+              );
+            })
       }
 
       {notReviewed.length > 0 && (
@@ -185,4 +218,5 @@ const styles = StyleSheet.create({
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   discardBtn: { padding: 14, alignItems: 'center' },
   discardText: { color: '#A32D2D', fontSize: 14 },
+  groupLabel: { fontSize: 13, fontWeight: '500', color: '#1a1a1a', marginBottom: 6, marginTop: 4 },
 });

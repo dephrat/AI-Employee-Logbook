@@ -235,16 +235,21 @@ def find_insert_row(ws, target_date):
         return last_data_row + 1
 
     insert_after = 3
+    last_seen_date = None
+
     for row in range(4, last_data_row + 1):
         cell_val = ws.cell(row=row, column=1).value
         if cell_val is not None:
             row_date = cell_val.date() if hasattr(cell_val, 'date') else parse_date(str(cell_val))
-            if row_date and row_date <= target_date:
+            if row_date:
+                last_seen_date = row_date
+            if last_seen_date and last_seen_date <= target_date:
                 insert_after = row
-            elif row_date and row_date > target_date:
+            elif last_seen_date and last_seen_date > target_date:
                 break
         else:
-            if insert_after >= 4:
+            # Blank date row — belongs to last_seen_date group
+            if last_seen_date and last_seen_date <= target_date:
                 insert_after = row
 
     return insert_after + 1

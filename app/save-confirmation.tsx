@@ -1,8 +1,8 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { getSavedFormsSummary, clearSavedFormsSummary, FormData } from '../storage/forms';
+import { useCallback, useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { clearSavedFormsSummary, FormData, getSavedFormsSummary } from '../storage/forms';
 
 const COLUMNS = ['Date', 'Source', 'Non-Per.', 'Produce', 'Dairy', 'Meat', 'Baked Goods', 'Pet Food', 'Toys', 'Hygiene', 'School Sup.', 'Total'];
 
@@ -26,6 +26,28 @@ function getTotals(forms: FormData[]): string[] {
   const grand = sums.reduce((a, b) => a + b, 0);
   return ['Total', '', ...sums.map(s => s > 0 ? s.toString() : ''), grand > 0 ? grand.toString() : '—'];
 }
+
+function groupByMonthYear(forms: FormData[]) {
+  const groups: Record<string, FormData[]> = {};
+  forms.forEach(form => {
+    const parts = form.date?.split('/');
+    if (parts?.length === 3) {
+      const key = `${parts[0]}/${parts[2]}`;
+      groups[key] = groups[key] || [];
+      groups[key].push(form);
+    } else {
+      groups['Unknown'] = groups['Unknown'] || [];
+      groups['Unknown'].push(form);
+    }
+  });
+  return groups;
+}
+
+const MONTH_LABELS: Record<string, string> = {
+  '01':'January','02':'February','03':'March','04':'April',
+  '05':'May','06':'June','07':'July','08':'August',
+  '09':'September','10':'October','11':'November','12':'December',
+};
 
 export default function SaveConfirmationScreen() {
   const [savedForms, setSavedForms] = useState<FormData[]>([]);
@@ -55,21 +77,33 @@ export default function SaveConfirmationScreen() {
       </View>
 
       <Text style={styles.sectionLabel}>What was saved</Text>
-      <ScrollView horizontal style={styles.tableWrap}>
-        <View>
-          <View style={[styles.tableRow, styles.headerRow]}>
-            {COLUMNS.map(col => <Text key={col} style={[styles.cell, styles.headerCell]}>{col}</Text>)}
-          </View>
-          {savedForms.map(form => (
-            <View key={form.id} style={styles.tableRow}>
-              {getRow(form).map((cell, j) => <Text key={j} style={styles.cell}>{cell}</Text>)}
+      {Object.entries(groupByMonthYear(savedForms))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, group]) => {
+          const [mm, yyyy] = key.split('/');
+          const label = key === 'Unknown' ? 'Unknown date' : `${MONTH_LABELS[mm] || mm} ${yyyy}`;
+          return (
+            <View key={key}>
+              <Text style={styles.groupLabel}>{label}</Text>
+              <ScrollView horizontal style={styles.tableWrap}>
+                <View>
+                  <View style={[styles.tableRow, styles.headerRow]}>
+                    {COLUMNS.map(col => <Text key={col} style={[styles.cell, styles.headerCell]}>{col}</Text>)}
+                  </View>
+                  {group.map(form => (
+                    <View key={form.id} style={styles.tableRow}>
+                      {getRow(form).map((cell, j) => <Text key={j} style={styles.cell}>{cell}</Text>)}
+                    </View>
+                  ))}
+                  <View style={[styles.tableRow, styles.totalRow]}>
+                    {getTotals(group).map((cell, j) => <Text key={j} style={[styles.cell, styles.totalCell]}>{cell}</Text>)}
+                  </View>
+                </View>
+              </ScrollView>
             </View>
-          ))}
-          <View style={[styles.tableRow, styles.totalRow]}>
-            {getTotals(savedForms).map((cell, j) => <Text key={j} style={[styles.cell, styles.totalCell]}>{cell}</Text>)}
-          </View>
-        </View>
-      </ScrollView>
+          );
+        })
+      }
 
       <Text style={styles.sectionLabel}>Form details</Text>
       {savedForms.map(form => (
@@ -104,6 +138,7 @@ const styles = StyleSheet.create({
   successTitle: { fontSize: 20, fontWeight: '600', color: '#27500A' },
   successSub: { fontSize: 14, color: '#3B6D11' },
   sectionLabel: { fontSize: 12, fontWeight: '500', color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 },
+  groupLabel: { fontSize: 13, fontWeight: '500', color: '#1a1a1a', marginBottom: 6, marginTop: 4 },
   tableWrap: { borderWidth: 0.5, borderColor: '#0002', borderRadius: 10 },
   tableRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#0001' },
   headerRow: { backgroundColor: '#185FA5' },
