@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -47,7 +48,17 @@ export default function CameraScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
       if (photo) {
-        const form = await addForm(photo.uri);
+        let uri = photo.uri;
+        // If landscape, rotate to portrait
+        if (photo.width > photo.height) {
+          const rotated = await ImageManipulator.manipulateAsync(
+            uri,
+            [{ rotate: 90 }],
+            { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          uri = rotated.uri;
+        }
+        const form = await addForm(uri);
         setForms(prev => [...prev, form]);
         runOcr(form);
       }
