@@ -1,23 +1,29 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef, useCallback } from 'react';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useFocusEffect } from 'expo-router';
-import { addForm, getForms, updateForm, getServerUrl, runOcr, FormData } from '../../storage/forms';
+import { useCallback, useRef, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { addForm, FormData, getForms, runOcr } from '../../storage/forms';
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [forms, setForms] = useState<FormData[]>([]);
   const [taking, setTaking] = useState(false);
+  const [autoFocus, setAutoFocus] = useState<'on' | 'off'>('on');
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
-  
+
   useFocusEffect(
     useCallback(() => {
       getForms().then(setForms);
     }, [])
   );
+
+  function triggerFocus() {
+    setAutoFocus('off');
+    setTimeout(() => setAutoFocus('on'), 100);
+  }
 
   if (!permission) {
     return <View style={styles.container} />;
@@ -53,19 +59,16 @@ export default function CameraScreen() {
   return (
     <View style={styles.container}>
       {/* Camera fills entire screen */}
-      <CameraView 
-        style={styles.viewfinder} 
-        ref={cameraRef} 
-        facing="back" 
-        autofocus="on"
-        onTap={({ nativeEvent }) => {
-          cameraRef.current?.focus({ x: nativeEvent.touchX, y: nativeEvent.touchY });
-        }}
+      <CameraView
+        style={styles.viewfinder}
+        ref={cameraRef}
+        facing="back"
+        autofocus={autoFocus}
       />
 
       {/* Controls overlaid on top */}
       <View style={styles.overlay}>
-        {/* Thumbnail strip — top */}
+        {/* Top bar with thumbnail strip and focus button */}
         <View style={styles.topBar}>
           <ScrollView horizontal contentContainerStyle={styles.stripContent}>
             {forms.length === 0
@@ -75,6 +78,9 @@ export default function CameraScreen() {
                 ))
             }
           </ScrollView>
+          <TouchableOpacity style={styles.focusBtn} onPress={triggerFocus}>
+            <Ionicons name="scan-outline" size={22} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         {/* Spacer */}
@@ -109,10 +115,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
     height: 110,
     justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   stripContent: { alignItems: 'center', gap: 8 },
   stripEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
   thumb: { width: 56, height: 56, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  focusBtn: { marginLeft: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 8 },
   bottomBar: {
     paddingBottom: 32,
     paddingHorizontal: 32,

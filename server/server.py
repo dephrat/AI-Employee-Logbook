@@ -93,9 +93,10 @@ Extract all visible values and return ONLY a JSON object with these exact keys:
 
 Rules:
 - Only include values you can clearly read. Leave blank if uncertain.
-- For categories, only include a value if that category is circled/selected AND has a number written next to it.
+- For categories, use checkboxes as the primary signal — if a checkbox is marked in any way (tick, cross, fill, circle, etc.), that category was selected. The weight written nearest to a marked checkbox belongs to that category, even if slightly misaligned.
+- If no checkboxes are present on the form, match numbers to categories based on their position relative to the category labels.
 - Weight values should be numbers only (no "lbs" or units).
-- Date should be in mm/dd/yyyy format.
+- Date can be in any format — convert it to mm/dd/yyyy. For example "Jun 7 26", "7/6/26", "June 7 2026" should all become "06/07/2026".
 - newDonor should be "yes", "no", or "" if not filled.
 - If a value appears crossed out with a new value written nearby, use the new value only.
 - If you cannot determine which value is correct due to corrections or unclear writing, make your best guess — the reviewer will verify.
