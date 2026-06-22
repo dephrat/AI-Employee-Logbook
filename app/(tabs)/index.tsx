@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addForm, FormData, getForms, runOcr } from '../../storage/forms';
 
@@ -15,6 +15,7 @@ export default function CameraScreen() {
   const [autoFocus, setAutoFocus] = useState<'on' | 'off'>('on');
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   useFocusEffect(
     useCallback(() => {
@@ -25,6 +26,27 @@ export default function CameraScreen() {
   function triggerFocus() {
     setAutoFocus('off');
     setTimeout(() => setAutoFocus('on'), 100);
+  }
+
+  function getTableCropRegion(imageWidth: number, imageHeight: number) {
+    const guideTop = 40;
+    const guideBottom = screenHeight - 160;
+    const guideHeight = guideBottom - guideTop;
+    const guideWidth = screenWidth * 0.85;
+    const guideLeft = (screenWidth - guideWidth) / 2;
+
+    const scaleX = imageWidth / screenWidth;
+    const scaleY = imageHeight / screenHeight;
+
+    const TABLE_TOP_RATIO = 0.28;    // how far down from top of form the table starts
+    const TABLE_HEIGHT_RATIO = 0.22; // height of table as % of form height
+
+    return {
+      originX: Math.round(guideLeft * scaleX),
+      originY: Math.round((guideTop + guideHeight * TABLE_TOP_RATIO) * scaleY),
+      width: Math.round(guideWidth * scaleX),
+      height: Math.round(guideHeight * TABLE_HEIGHT_RATIO * scaleY),
+    };
   }
 
   if (!permission) {
@@ -51,6 +73,8 @@ export default function CameraScreen() {
       if (photo) {
         let uri = photo.uri;
         const exifOrientation = photo.exif?.Orientation;
+
+        // Rotate based on EXIF
         if (exifOrientation === 1) {
           const rotated = await ImageManipulator.manipulateAsync(uri, [{ rotate: 90 }], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
           uri = rotated.uri;
@@ -61,7 +85,23 @@ export default function CameraScreen() {
           const rotated = await ImageManipulator.manipulateAsync(uri, [{ rotate: 180 }], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
           uri = rotated.uri;
         }
-        const form = await addForm(uri);
+
+        // Get final image dimensions after rotation
+        const finalInfo = await ImageManipulator.manipulateAsync(uri, [], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
+        const finalWidth = finalInfo.width;
+        const finalHeight = finalInfo.height;
+
+        // Crop table preview
+        const cropRegion = getTableCropRegion(finalWidth, finalHeight);
+        console.log('crop region:', JSON.stringify(cropRegion));
+        console.log('image size:', finalWidth, 'x', finalHeight);
+        const tablePreview = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ crop: cropRegion }],
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        );
+
+        const form = await addForm(uri, tablePreview.uri);
         setForms(prev => [...prev, form]);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         runOcr(form);

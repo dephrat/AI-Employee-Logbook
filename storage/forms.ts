@@ -6,6 +6,7 @@ export type FormStatus = 'unscanned' | 'ocr_failed' | 'needs_review' | 'approved
 export type FormData = {
   id: string;
   photoUri: string;
+  tablePreviewUri?: string;
   status: FormStatus;
   createdAt: string;
   // Donation info
@@ -50,11 +51,12 @@ export async function saveForms(forms: FormData[]): Promise<void> {
   }
 }
 
-export async function addForm(photoUri: string): Promise<FormData> {
+export async function addForm(photoUri: string, tablePreviewUri?: string): Promise<FormData> {
   const forms = await getForms();
   const newForm: FormData = {
     id: Date.now().toString(),
     photoUri,
+    tablePreviewUri,
     status: 'unscanned',
     createdAt: new Date().toISOString(),
     date: '', donor: '', weight: '',

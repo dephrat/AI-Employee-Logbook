@@ -1,9 +1,9 @@
-import { Alert, View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Image, Modal } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { getForms, updateForm, deleteForm, FormData } from '../storage/forms';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { deleteForm, FormData, getForms, updateForm } from '../storage/forms';
 
 const CATEGORIES: { label: string; field: keyof FormData }[] = [
   { label: 'Non-Perishable', field: 'nonPerishable' },
@@ -88,7 +88,7 @@ export default function FormDetailScreen() {
         <>
           <TouchableOpacity onPress={() => setPhotoExpanded(true)} style={styles.photoThumbWrap}>
             <Image
-              source={{ uri: form.photoUri }}
+              source={{ uri: form.tablePreviewUri || form.photoUri }}
               style={styles.photoThumb}
               resizeMode="cover"
             />
