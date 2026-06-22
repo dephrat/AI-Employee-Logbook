@@ -46,14 +46,15 @@ export default function CameraScreen() {
     if (!cameraRef.current || taking) return;
     setTaking(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7, exif: true });
       if (photo) {
         let uri = photo.uri;
-        // If landscape, rotate to portrait
         if (photo.width > photo.height) {
+          const exifOrientation = photo.exif?.Orientation;
+          const rotateDeg = exifOrientation === 3 ? -90 : 90;
           const rotated = await ImageManipulator.manipulateAsync(
             uri,
-            [{ rotate: 90 }],
+            [{ rotate: rotateDeg }],
             { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG }
           );
           uri = rotated.uri;
