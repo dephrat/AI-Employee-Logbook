@@ -85,7 +85,7 @@ export default function CameraScreen() {
           <ScrollView horizontal contentContainerStyle={styles.stripContent}>
             {forms.length === 0
               ? <Text style={styles.stripEmpty}>No photos yet</Text>
-              : forms.map((form) => (
+              : forms.slice().reverse().map((form) => (
                   <Image key={form.id} source={{ uri: form.photoUri }} style={styles.thumb} />
                 ))
             }
