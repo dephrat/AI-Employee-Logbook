@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
@@ -61,6 +62,7 @@ export default function CameraScreen() {
         }
         const form = await addForm(uri);
         setForms(prev => [...prev, form]);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         runOcr(form);
       }
     } finally {
@@ -76,6 +78,7 @@ export default function CameraScreen() {
         ref={cameraRef}
         facing="back"
         autofocus={autoFocus}
+        animateShutter={false}
       />
 
       {/* Controls overlaid on top */}
