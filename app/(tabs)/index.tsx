@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addForm, FormData, getForms, runOcr } from '../../storage/forms';
 
@@ -73,7 +73,6 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Camera fills entire screen */}
       <CameraView
         style={styles.viewfinder}
         ref={cameraRef}
@@ -82,39 +81,45 @@ export default function CameraScreen() {
         animateShutter={false}
       />
 
-      {/* Controls overlaid on top */}
       <View style={styles.overlay}>
-        {/* Top bar with thumbnail strip and focus button */}
-        <View style={styles.topBar}>
-          <ScrollView horizontal contentContainerStyle={styles.stripContent}>
-            {forms.length === 0
-              ? <Text style={styles.stripEmpty}>No photos yet</Text>
-              : forms.slice().reverse().map((form) => (
-                  <Image key={form.id} source={{ uri: form.photoUri }} style={styles.thumb} />
-                ))
-            }
-          </ScrollView>
-          <TouchableOpacity style={styles.focusBtn} onPress={triggerFocus}>
-            <Ionicons name="scan-outline" size={22} color="#fff" />
-          </TouchableOpacity>
+        {/* Form alignment guide */}
+        <View style={styles.formGuide}>
+          <View style={styles.formGuideRect} />
         </View>
-
-        {/* Spacer */}
-        <View style={{ flex: 1 }} />
 
         {/* Bottom controls */}
         <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[styles.doneBtn, forms.length === 0 && styles.doneBtnDisabled]}
-            disabled={forms.length === 0}
-            onPress={() => router.push('/(tabs)/explore')}
-          >
-            <Text style={styles.doneBtnText}>Review {forms.length} photo{forms.length !== 1 ? 's' : ''}</Text>
-          </TouchableOpacity>
+          {/* Last photo thumbnail — bottom left */}
+          <View style={styles.thumbWrap}>
+            {forms.length > 0
+              ? <Image source={{ uri: forms[forms.length - 1].photoUri }} style={styles.lastThumb} />
+              : <View style={styles.lastThumbEmpty} />
+            }
+            {forms.length > 0 && (
+              <View style={styles.thumbCount}>
+                <Text style={styles.thumbCountText}>{forms.length}</Text>
+              </View>
+            )}
+          </View>
 
+          {/* Shutter */}
           <TouchableOpacity style={styles.shutter} onPress={takePicture} disabled={taking}>
             <View style={[styles.shutterInner, taking && { backgroundColor: '#aaa' }]} />
           </TouchableOpacity>
+
+          {/* Focus + Review */}
+          <View style={styles.rightControls}>
+            <TouchableOpacity style={styles.focusBtn} onPress={triggerFocus}>
+              <Ionicons name="scan-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reviewBtn, forms.length === 0 && styles.reviewBtnDisabled]}
+              disabled={forms.length === 0}
+              onPress={() => router.push('/(tabs)/explore')}
+            >
+              <Text style={styles.reviewBtnText}>Review photos</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
@@ -124,33 +129,44 @@ export default function CameraScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   viewfinder: { ...StyleSheet.absoluteFillObject },
-  overlay: { flex: 1, flexDirection: 'column' },
-  topBar: {
-    paddingTop: 48,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    height: 110,
+  overlay: { flex: 1, flexDirection: 'column', justifyContent: 'flex-end' },
+  formGuide: {
+    position: 'absolute',
+    top: 40,
+    bottom: 160,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  formGuideRect: {
+    width: '85%',
+    aspectRatio: 0.77,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.6)',
+    borderRadius: 8,
+  },
+  bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  stripContent: { alignItems: 'center', gap: 8 },
-  stripEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
-  thumb: { width: 56, height: 56, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  focusBtn: { marginLeft: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 8 },
-  bottomBar: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
     paddingBottom: 32,
-    paddingHorizontal: 32,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-    gap: 20,
     paddingTop: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
+  thumbWrap: { width: 64, height: 64, position: 'relative' },
+  lastThumb: { width: 64, height: 64, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+  lastThumbEmpty: { width: 64, height: 64, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.05)' },
+  thumbCount: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 },
+  thumbCountText: { color: '#fff', fontSize: 11, fontWeight: '500' },
   shutter: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shutterInner: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff' },
-  doneBtn: { backgroundColor: '#185FA5', borderRadius: 10, padding: 12, paddingHorizontal: 24, alignItems: 'center', width: '100%' },
-  doneBtnDisabled: { opacity: 0.4 },
-  doneBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  rightControls: { width: 64, alignItems: 'center', gap: 8 },
+  focusBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 8 },
+  reviewBtn: { backgroundColor: '#185FA5', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6, alignItems: 'center' },
+  reviewBtnDisabled: { opacity: 0.4 },
+  reviewBtnText: { color: '#fff', fontSize: 12, fontWeight: '500', textAlign: 'center' },
   permContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16, backgroundColor: '#fff' },
   permText: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
   permBtn: { backgroundColor: '#185FA5', borderRadius: 10, padding: 14, alignItems: 'center', width: '100%' },
