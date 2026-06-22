@@ -50,14 +50,15 @@ export default function CameraScreen() {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.7, exif: true });
       if (photo) {
         let uri = photo.uri;
-        if (photo.width > photo.height) {
-          const exifOrientation = photo.exif?.Orientation;
-          const rotateDeg = exifOrientation === 3 ? -90 : 90;
-          const rotated = await ImageManipulator.manipulateAsync(
-            uri,
-            [{ rotate: rotateDeg }],
-            { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG }
-          );
+        const exifOrientation = photo.exif?.Orientation;
+        if (exifOrientation === 1) {
+          const rotated = await ImageManipulator.manipulateAsync(uri, [{ rotate: 90 }], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
+          uri = rotated.uri;
+        } else if (exifOrientation === 3) {
+          const rotated = await ImageManipulator.manipulateAsync(uri, [{ rotate: -90 }], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
+          uri = rotated.uri;
+        } else if (exifOrientation === 8) {
+          const rotated = await ImageManipulator.manipulateAsync(uri, [{ rotate: 180 }], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
           uri = rotated.uri;
         }
         const form = await addForm(uri);
