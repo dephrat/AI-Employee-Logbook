@@ -87,11 +87,18 @@ export default function FormDetailScreen() {
       {form.photoUri && (
         <>
           <TouchableOpacity onPress={() => setPhotoExpanded(true)} style={styles.photoThumbWrap}>
-            <Image
-              source={{ uri: form.tablePreviewUri || form.photoUri }}
-              style={styles.photoThumb}
-              resizeMode="cover"
-            />
+            {form.tablePreviewUri ? (
+              <Image
+                source={{ uri: form.tablePreviewUri }}
+                style={styles.photoThumb}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.photoThumb, styles.photoThumbLoading]}>
+                <Ionicons name="image-outline" size={24} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.photoThumbLoadingText}>Generating preview...</Text>
+              </View>
+            )}
             <View style={styles.photoHint}>
               <Ionicons name="expand-outline" size={18} color="#fff" />
             </View>
@@ -312,4 +319,6 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dateInput: { flex: 1 },
   calendarBtn: { padding: 9, borderWidth: 0.5, borderColor: '#0002', borderRadius: 8 },
+  photoThumbLoading: { alignItems: 'center', justifyContent: 'center', gap: 6 },
+  photoThumbLoadingText: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
 });

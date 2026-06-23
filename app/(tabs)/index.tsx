@@ -6,9 +6,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { addForm, FormData, getForms, runOcr } from '../../storage/forms';
+import { addForm, FormData, getForms, runOcr, updateForm } from '../../storage/forms';
 
-// Tune these to adjust where the table preview is cropped
 const TABLE_TOP_RATIO = 0.28;
 const TABLE_HEIGHT_RATIO = 0.22;
 const TABLE_LEFT_RATIO = 0.02;
@@ -35,7 +34,6 @@ export default function CameraScreen() {
   }
 
   function getCropRegions(imageWidth: number, imageHeight: number) {
-    // Outline position on screen
     const guideTop = 40;
     const guideBottom = screenHeight - 160;
     const guideHeight = guideBottom - guideTop;
@@ -45,7 +43,6 @@ export default function CameraScreen() {
     const scaleX = imageWidth / screenWidth;
     const scaleY = imageHeight / screenHeight;
 
-    // Crop 1 — full form outline
     const formCrop = {
       originX: Math.round(guideLeft * scaleX),
       originY: Math.round(guideTop * scaleY),
@@ -53,7 +50,6 @@ export default function CameraScreen() {
       height: Math.round(guideHeight * scaleY),
     };
 
-    // Crop 2 — table within form
     const tableCrop = {
       originX: Math.round(formCrop.width * TABLE_LEFT_RATIO),
       originY: Math.round(formCrop.height * TABLE_TOP_RATIO),
@@ -62,6 +58,39 @@ export default function CameraScreen() {
     };
 
     return { formCrop, tableCrop };
+  }
+
+  async function generatePreview(formId: string, uri: string) {
+    try {
+      const finalInfo = await ImageManipulator.manipulateAsync(uri, [], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
+      const { formCrop, tableCrop } = getCropRegions(finalInfo.width, finalInfo.height);
+
+      const formImg = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ crop: formCrop }],
+        { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const tableImg = await ImageManipulator.manipulateAsync(
+        formImg.uri,
+        [{ crop: tableCrop }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      // Check if OCR already finished
+      const allForms = await getForms();
+      const current = allForms.find(f => f.id === formId);
+      const newStatus = (current?.date || current?.donor) ? 'needs_review' : current?.status;
+
+      await updateForm(formId, {
+        tablePreviewUri: tableImg.uri,
+        previewReady: true,
+        ...(newStatus ? { status: newStatus } : {}),
+      });
+    } catch (e) {
+      console.error('Preview generation failed:', e);
+      await updateForm(formId, { previewReady: true });
+    }
   }
 
   if (!permission) {
@@ -100,31 +129,15 @@ export default function CameraScreen() {
           uri = rotated.uri;
         }
 
-        // Get actual dimensions after rotation
-        const finalInfo = await ImageManipulator.manipulateAsync(uri, [], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
-        const finalWidth = finalInfo.width;
-        const finalHeight = finalInfo.height;
-
-        const { formCrop, tableCrop } = getCropRegions(finalWidth, finalHeight);
-
-        // Crop 1 — form outline
-        const formImg = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ crop: formCrop }],
-          { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG }
-        );
-
-        // Crop 2 — table within form
-        const tableImg = await ImageManipulator.manipulateAsync(
-          formImg.uri,
-          [{ crop: tableCrop }],
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-        );
-
-        const form = await addForm(uri, tableImg.uri);
+        const form = await addForm(uri);
         setForms(prev => [...prev, form]);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        runOcr(form);
+
+        // Fire OCR and preview generation in parallel
+        Promise.all([
+          runOcr(form),
+          generatePreview(form.id, uri),
+        ]);
       }
     } finally {
       setTaking(false);
@@ -142,7 +155,6 @@ export default function CameraScreen() {
       />
 
       <View style={styles.overlay}>
-        {/* Form alignment guide */}
         <View style={styles.formGuide}>
           <View style={styles.formGuideRect}>
             <View style={[styles.tableGuideRect, {
@@ -152,7 +164,6 @@ export default function CameraScreen() {
           </View>
         </View>
 
-        {/* Bottom controls */}
         <View style={styles.bottomBar}>
           <View style={styles.thumbWrap}>
             {forms.length > 0

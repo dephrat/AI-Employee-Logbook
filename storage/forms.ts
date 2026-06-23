@@ -7,13 +7,12 @@ export type FormData = {
   id: string;
   photoUri: string;
   tablePreviewUri?: string;
+  previewReady?: boolean;
   status: FormStatus;
   createdAt: string;
-  // Donation info
   date: string;
   donor: string;
   weight: string;
-  // Category weights
   nonPerishable: string;
   produce: string;
   dairy: string;
@@ -24,7 +23,6 @@ export type FormData = {
   hygiene: string;
   schoolSupplies: string;
   other: string;
-  // Contact (optional)
   contactName: string;
   contactAddress: string;
   contactEmail: string;
@@ -51,12 +49,11 @@ export async function saveForms(forms: FormData[]): Promise<void> {
   }
 }
 
-export async function addForm(photoUri: string, tablePreviewUri?: string): Promise<FormData> {
+export async function addForm(photoUri: string): Promise<FormData> {
   const forms = await getForms();
   const newForm: FormData = {
     id: Date.now().toString(),
     photoUri,
-    tablePreviewUri,
     status: 'unscanned',
     createdAt: new Date().toISOString(),
     date: '', donor: '', weight: '',

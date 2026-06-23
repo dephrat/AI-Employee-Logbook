@@ -9,6 +9,7 @@ const BADGE: Record<string, { label: string; bg: string; color: string }> = {
   needs_review: { label: 'Needs review', bg: '#FAEEDA', color: '#633806' },
   unscanned:    { label: 'Analyzing',    bg: '#F1EFE8', color: '#5F5E5A' },
   ocr_failed:   { label: 'OCR failed',   bg: '#FDECEA', color: '#8B1A1A' },
+  ocr_done:     { label: 'Analyzing', bg: '#F1EFE8', color: '#5F5E5A' },
 };
 
 function isPossibleDuplicate(a: FormData, b: FormData): boolean {
