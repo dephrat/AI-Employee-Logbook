@@ -97,6 +97,7 @@ export default function FormDetailScreen() {
               <View style={[styles.photoThumb, styles.photoThumbLoading]}>
                 <Ionicons name="image-outline" size={24} color="rgba(255,255,255,0.4)" />
                 <Text style={styles.photoThumbLoadingText}>Generating preview...</Text>
+                <Text style={styles.photoThumbLoadingSubtext}>Go back and tap Refresh to update</Text>
               </View>
             )}
             <View style={styles.photoHint}>
@@ -321,4 +322,5 @@ const styles = StyleSheet.create({
   calendarBtn: { padding: 9, borderWidth: 0.5, borderColor: '#0002', borderRadius: 8 },
   photoThumbLoading: { alignItems: 'center', justifyContent: 'center', gap: 6 },
   photoThumbLoadingText: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
+  photoThumbLoadingSubtext: { color: 'rgba(255,255,255,0.3)', fontSize: 11 },
 });

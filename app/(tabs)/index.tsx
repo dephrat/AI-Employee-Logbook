@@ -184,6 +184,7 @@ export default function CameraScreen() {
           <View style={styles.rightControls}>
             <TouchableOpacity style={styles.focusBtn} onPress={triggerFocus}>
               <Ionicons name="scan-outline" size={22} color="#fff" />
+              <Text style={styles.focusBtnText}>Focus</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.reviewBtn, forms.length === 0 && styles.reviewBtnDisabled]}
@@ -252,4 +253,5 @@ const styles = StyleSheet.create({
   permText: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
   permBtn: { backgroundColor: '#185FA5', borderRadius: 10, padding: 14, alignItems: 'center', width: '100%' },
   permBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  focusBtnText: { color: '#fff', fontSize: 10, marginTop: 2 },
 });
