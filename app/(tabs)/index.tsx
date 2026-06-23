@@ -8,6 +8,12 @@ import { Image, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addForm, FormData, getForms, runOcr } from '../../storage/forms';
 
+// Tune these to adjust where the table preview is cropped
+const TABLE_TOP_RATIO = 0.28;
+const TABLE_HEIGHT_RATIO = 0.22;
+const TABLE_LEFT_RATIO = 0.02;
+const TABLE_WIDTH_RATIO = 0.96;
+
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [forms, setForms] = useState<FormData[]>([]);
@@ -16,8 +22,6 @@ export default function CameraScreen() {
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const TABLE_TOP_RATIO = 0.28;   // how far down from top of form the table starts
-  const TABLE_HEIGHT_RATIO = 0.22; // height of table as % of form height
 
   useFocusEffect(
     useCallback(() => {
@@ -30,7 +34,8 @@ export default function CameraScreen() {
     setTimeout(() => setAutoFocus('on'), 100);
   }
 
-  function getTableCropRegion(imageWidth: number, imageHeight: number) {
+  function getCropRegions(imageWidth: number, imageHeight: number) {
+    // Outline position on screen
     const guideTop = 40;
     const guideBottom = screenHeight - 160;
     const guideHeight = guideBottom - guideTop;
@@ -40,18 +45,23 @@ export default function CameraScreen() {
     const scaleX = imageWidth / screenWidth;
     const scaleY = imageHeight / screenHeight;
 
-    const TABLE_TOP_RATIO = 0.28;
-    const PREVIEW_HEIGHT = 180; // must match photoThumb height
-
-    const cropWidth = Math.round(guideWidth * scaleX);
-    const cropHeight = Math.round(cropWidth * (PREVIEW_HEIGHT / screenWidth));
-
-    return {
+    // Crop 1 — full form outline
+    const formCrop = {
       originX: Math.round(guideLeft * scaleX),
-      originY: Math.round((guideTop + guideHeight * TABLE_TOP_RATIO) * scaleY),
-      width: cropWidth,
-      height: cropHeight,
+      originY: Math.round(guideTop * scaleY),
+      width: Math.round(guideWidth * scaleX),
+      height: Math.round(guideHeight * scaleY),
     };
+
+    // Crop 2 — table within form
+    const tableCrop = {
+      originX: Math.round(formCrop.width * TABLE_LEFT_RATIO),
+      originY: Math.round(formCrop.height * TABLE_TOP_RATIO),
+      width: Math.round(formCrop.width * TABLE_WIDTH_RATIO),
+      height: Math.round(formCrop.height * TABLE_HEIGHT_RATIO),
+    };
+
+    return { formCrop, tableCrop };
   }
 
   if (!permission) {
@@ -79,7 +89,6 @@ export default function CameraScreen() {
         let uri = photo.uri;
         const exifOrientation = photo.exif?.Orientation;
 
-        // Rotate based on EXIF
         if (exifOrientation === 1) {
           const rotated = await ImageManipulator.manipulateAsync(uri, [{ rotate: 90 }], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
           uri = rotated.uri;
@@ -91,22 +100,28 @@ export default function CameraScreen() {
           uri = rotated.uri;
         }
 
-        // Get final image dimensions after rotation
+        // Get actual dimensions after rotation
         const finalInfo = await ImageManipulator.manipulateAsync(uri, [], { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG });
         const finalWidth = finalInfo.width;
         const finalHeight = finalInfo.height;
 
-        // Crop table preview
-        const cropRegion = getTableCropRegion(finalWidth, finalHeight);
-        console.log('crop region:', JSON.stringify(cropRegion));
-        console.log('image size:', finalWidth, 'x', finalHeight);
-        const tablePreview = await ImageManipulator.manipulateAsync(
+        const { formCrop, tableCrop } = getCropRegions(finalWidth, finalHeight);
+
+        // Crop 1 — form outline
+        const formImg = await ImageManipulator.manipulateAsync(
           uri,
-          [{ crop: cropRegion }],
+          [{ crop: formCrop }],
+          { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG }
+        );
+
+        // Crop 2 — table within form
+        const tableImg = await ImageManipulator.manipulateAsync(
+          formImg.uri,
+          [{ crop: tableCrop }],
           { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
         );
 
-        const form = await addForm(uri, tablePreview.uri);
+        const form = await addForm(uri, tableImg.uri);
         setForms(prev => [...prev, form]);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         runOcr(form);
@@ -130,13 +145,15 @@ export default function CameraScreen() {
         {/* Form alignment guide */}
         <View style={styles.formGuide}>
           <View style={styles.formGuideRect}>
-            <View style={styles.tableGuideRect} />
+            <View style={[styles.tableGuideRect, {
+              top: `${TABLE_TOP_RATIO * 100}%`,
+              height: `${TABLE_HEIGHT_RATIO * 100}%`,
+            }]} />
           </View>
         </View>
 
         {/* Bottom controls */}
         <View style={styles.bottomBar}>
-          {/* Last photo thumbnail — bottom left */}
           <View style={styles.thumbWrap}>
             {forms.length > 0
               ? <Image source={{ uri: forms[forms.length - 1].photoUri }} style={styles.lastThumb} />
@@ -149,12 +166,10 @@ export default function CameraScreen() {
             )}
           </View>
 
-          {/* Shutter */}
           <TouchableOpacity style={styles.shutter} onPress={takePicture} disabled={taking}>
             <View style={[styles.shutterInner, taking && { backgroundColor: '#aaa' }]} />
           </TouchableOpacity>
 
-          {/* Focus + Review */}
           <View style={styles.rightControls}>
             <TouchableOpacity style={styles.focusBtn} onPress={triggerFocus}>
               <Ionicons name="scan-outline" size={22} color="#fff" />
@@ -193,6 +208,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.6)',
     borderRadius: 8,
   },
+  tableGuideRect: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderWidth: 1.5,
+    borderColor: 'rgba(100,180,255,0.7)',
+    borderStyle: 'dashed',
+  },
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -218,14 +241,4 @@ const styles = StyleSheet.create({
   permText: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
   permBtn: { backgroundColor: '#185FA5', borderRadius: 10, padding: 14, alignItems: 'center', width: '100%' },
   permBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  tableGuideRect: {
-    position: 'absolute',
-    top: '28%',
-    left: 0,
-    right: 0,
-    height: '22%',
-    borderWidth: 1.5,
-    borderColor: 'rgba(100,180,255,0.7)',
-    borderStyle: 'dashed',
-  },
 });
