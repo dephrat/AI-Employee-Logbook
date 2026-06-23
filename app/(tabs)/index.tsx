@@ -184,7 +184,7 @@ export default function CameraScreen() {
           <View style={styles.rightControls}>
             <TouchableOpacity style={styles.focusBtn} onPress={triggerFocus}>
               <Ionicons name="scan-outline" size={22} color="#fff" />
-              <Text style={styles.focusBtnText}>Focus</Text>
+              <Text style={styles.focusBtnText}>Refocus</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.reviewBtn, forms.length === 0 && styles.reviewBtnDisabled]}

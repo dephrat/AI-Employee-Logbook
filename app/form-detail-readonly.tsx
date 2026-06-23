@@ -1,15 +1,15 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { getSavedFormsSummary, FormData } from '../storage/forms';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FormData, getSavedFormsSummary } from '../storage/forms';
 
 const CATEGORIES: { label: string; field: keyof FormData }[] = [
   { label: 'Non-Perishable', field: 'nonPerishable' },
   { label: 'Produce',        field: 'produce' },
   { label: 'Dairy',          field: 'dairy' },
-  { label: 'Meat',           field: 'meat' },
   { label: 'Baked Goods',    field: 'bakedGoods' },
+  { label: 'Meat',           field: 'meat' },
   { label: 'Pet Food',       field: 'petFood' },
   { label: 'Toys',           field: 'toys' },
   { label: 'Hygiene',        field: 'hygiene' },
