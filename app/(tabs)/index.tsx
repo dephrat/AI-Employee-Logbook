@@ -16,6 +16,8 @@ export default function CameraScreen() {
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const TABLE_TOP_RATIO = 0.28;   // how far down from top of form the table starts
+  const TABLE_HEIGHT_RATIO = 0.22; // height of table as % of form height
 
   useFocusEffect(
     useCallback(() => {
@@ -38,14 +40,17 @@ export default function CameraScreen() {
     const scaleX = imageWidth / screenWidth;
     const scaleY = imageHeight / screenHeight;
 
-    const TABLE_TOP_RATIO = 0.28;    // how far down from top of form the table starts
-    const TABLE_HEIGHT_RATIO = 0.22; // height of table as % of form height
+    const TABLE_TOP_RATIO = 0.28;
+    const PREVIEW_HEIGHT = 180; // must match photoThumb height
+
+    const cropWidth = Math.round(guideWidth * scaleX);
+    const cropHeight = Math.round(cropWidth * (PREVIEW_HEIGHT / screenWidth));
 
     return {
       originX: Math.round(guideLeft * scaleX),
       originY: Math.round((guideTop + guideHeight * TABLE_TOP_RATIO) * scaleY),
-      width: Math.round(guideWidth * scaleX),
-      height: Math.round(guideHeight * TABLE_HEIGHT_RATIO * scaleY),
+      width: cropWidth,
+      height: cropHeight,
     };
   }
 
@@ -124,7 +129,9 @@ export default function CameraScreen() {
       <View style={styles.overlay}>
         {/* Form alignment guide */}
         <View style={styles.formGuide}>
-          <View style={styles.formGuideRect} />
+          <View style={styles.formGuideRect}>
+            <View style={styles.tableGuideRect} />
+          </View>
         </View>
 
         {/* Bottom controls */}
@@ -211,4 +218,14 @@ const styles = StyleSheet.create({
   permText: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
   permBtn: { backgroundColor: '#185FA5', borderRadius: 10, padding: 14, alignItems: 'center', width: '100%' },
   permBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  tableGuideRect: {
+    position: 'absolute',
+    top: '28%',
+    left: 0,
+    right: 0,
+    height: '22%',
+    borderWidth: 1.5,
+    borderColor: 'rgba(100,180,255,0.7)',
+    borderStyle: 'dashed',
+  },
 });

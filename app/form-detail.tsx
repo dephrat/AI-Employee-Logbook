@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   scroll: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
-  photoThumb: { width: '100%', height: 120, backgroundColor: '#111' },
+  photoThumb: { width: '100%', height: 180, backgroundColor: '#111' },
   photoThumbWrap: { position: 'relative' },
   photoHint: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 6, padding: 6 },
   photoModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
