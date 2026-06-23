@@ -1,8 +1,8 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useState, useCallback, useRef } from 'react';
-import { getForms, runOcr, updateForm, FormData } from '../../storage/forms';
+import { useCallback, useRef, useState } from 'react';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FormData, getForms, runOcr, updateForm } from '../../storage/forms';
 
 const BADGE: Record<string, { label: string; bg: string; color: string }> = {
   approved:     { label: 'Approved',     bg: '#EAF3DE', color: '#27500A' },
@@ -10,6 +10,24 @@ const BADGE: Record<string, { label: string; bg: string; color: string }> = {
   unscanned:    { label: 'Analyzing',    bg: '#F1EFE8', color: '#5F5E5A' },
   ocr_failed:   { label: 'OCR failed',   bg: '#FDECEA', color: '#8B1A1A' },
 };
+
+function isPossibleDuplicate(a: FormData, b: FormData): boolean {
+  if (!a.date || !b.date) return false;
+  return (
+    a.date === b.date &&
+    a.donor === b.donor &&
+    a.weight === b.weight &&
+    a.nonPerishable === b.nonPerishable &&
+    a.produce === b.produce &&
+    a.dairy === b.dairy &&
+    a.meat === b.meat &&
+    a.bakedGoods === b.bakedGoods &&
+    a.petFood === b.petFood &&
+    a.toys === b.toys &&
+    a.hygiene === b.hygiene &&
+    a.schoolSupplies === b.schoolSupplies
+  );
+}
 
 export default function ReviewScreen() {
   const [forms, setForms] = useState<FormData[]>([]);
@@ -106,8 +124,10 @@ export default function ReviewScreen() {
         onRefresh={refresh}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={<Text style={styles.empty}>No photos yet — go to Camera to start.</Text>}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const badge = BADGE[item.status] || BADGE.unscanned;
+          const prevForm = index > 0 ? forms[index - 1] : null;
+          const isDuplicate = prevForm ? isPossibleDuplicate(item, prevForm) : false;
           return (
             <TouchableOpacity
               style={styles.row}
@@ -132,8 +152,15 @@ export default function ReviewScreen() {
                 <Text style={styles.name}>{item.donor || 'Unnamed form'}</Text>
                 <Text style={styles.meta}>{item.date || '—'} · {item.weight || '—'} lbs</Text>
               </View>
-              <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-                <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+              <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+                  <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+                </View>
+                {isDuplicate && (
+                  <View style={styles.dupBadge}>
+                    <Text style={styles.dupBadgeText}>Possible duplicate</Text>
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
           );
@@ -159,4 +186,6 @@ const styles = StyleSheet.create({
   separator: { height: 0.5, backgroundColor: '#0001' },
   empty: { color: '#aaa', textAlign: 'center', marginTop: 40 },
   analyzingHint: { fontSize: 13, color: '#888', textAlign: 'center', paddingVertical: 6 },
+  dupBadge: { backgroundColor: '#FFF0C2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 4 },
+  dupBadgeText: { fontSize: 11, fontWeight: '500', color: '#7A5200' },
 });
